@@ -1,89 +1,84 @@
-param (
-    [string]$ForzarModo = "" 
-)
+# ==========================================
+# CONFIGURACIÓN DE RUTAS Y TIEMPOS
+# ==========================================
+$IncFile = "C:\Users\chipi\Documents\Rainmeter\Skins\Mini-Steam Launcher\@Resources\SteamGames.inc"
+$UpdateScript = "H:\proyectos\UpdateMini.ps1"
+$libraryConfig = "C:\Program Files (x86)\Steam\steamapps\libraryfolders.vdf"
+$blizzPath = "H:\BlizardLibrary"
+$Intervalo = 120 # Revisa cada 2 minutos
+$manualExclusions = @(431960) 
 
-# --- CONFIGURACIÓN DE RUTAS ---
-$steamBase = "C:\Program Files (x86)\Steam"
-$libraryConfig = "$steamBase\steamapps\libraryfolders.vdf"
-$epicManifestPath = "$env:ProgramData\Epic\EpicGamesLauncher\Data\Manifests"
-$bnetPath = "H:\BlizardLibrary" 
-$mainScript = "H:\proyectos\UpdateMini.ps1"
-
-$lastTotalCount = 0
-
-Write-Host "[$((Get-Date).ToString('HH:mm:ss'))] [*] Inspector de Librerías Activo (Intervalo: 20s)" -ForegroundColor Cyan
-Write-Host "[*] Presiona Ctrl+C para detener el monitoreo." -ForegroundColor Gray
-Write-Host "[!] Monitoreando: Steam, Epic y Blizzard...`n" -ForegroundColor DarkGray
+Write-Host "Vigilante de librerías iniciado (segundo plano)..." -ForegroundColor Cyan
 
 while ($true) {
-    $currentTimestamp = Get-Date -Format "HH:mm:ss"
-    try {
-        # 1. Conteo Steam
-        $steamCount = 0
-        if (Test-Path $libraryConfig) {
+    # 1. ESCANEO (Lógica idéntica a UpdateMini.ps1)
+    $allGames = @()
+
+    # **** escaneo STEAM ****
+    if (Test-Path $libraryConfig) {
+        try {
             $configContent = Get-Content $libraryConfig -Raw
-            $libraryPaths = [regex]::Matches($configContent, '"path"\s+"(.+?)"') | ForEach-Object { $_.Groups[1].Value -replace "\\\\", "\" }
-            
+            $libraryPaths = [regex]::Matches($configContent, '"path"\s+"(.+?)"') | % { $_.Groups[1].Value -replace "\\\\", "\" }
             foreach ($path in $libraryPaths) {
                 $apps = Join-Path $path "steamapps"
                 if (Test-Path $apps) {
-                    $steamCount += (Get-ChildItem "$apps\appmanifest_*.acf" -ErrorAction SilentlyContinue).Count
+                    Get-ChildItem "$apps\appmanifest_*.acf" -ErrorAction SilentlyContinue | % {
+                        $content = Get-Content $_.FullName -Raw
+                        $appid = [regex]::Match($content, '"appid"\s+"(\d+)"').Groups[1].Value
+                        $name = [regex]::Match($content, '"name"\s+"(.+?)"').Groups[1].Value
+                        if ($manualExclusions -notcontains [int]$appid -and $name -notmatch "Steamworks|Redistributable|Server") {
+                            $allGames += [PSCustomObject]@{ ID = $appid; Type = "Steam" }
+                        }
+                    }
                 }
             }
         }
+        catch {}
+    }
+
+    # **** escaneo EPIC ****
+    $epicManifestPath = "$env:ProgramData\Epic\EpicGamesLauncher\Data\Manifests"
+    if (Test-Path $epicManifestPath) {
+        Get-ChildItem $epicManifestPath -Filter "*.item" -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                $content = Get-Content $_.FullName -Raw | ConvertFrom-Json
+                if (Test-Path $content.InstallLocation) {
+                    $allGames += [PSCustomObject]@{ ID = "epic_$($content.AppName)"; Type = "Epic" }
+                }
+            }
+            catch {}
+        }
+    }
+
+    # **** escaneo BLIZZARD ****
+    if (Test-Path $blizzPath) {
+        Get-ChildItem -Path $blizzPath -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+            $allGames += [PSCustomObject]@{ ID = "blizz_$($_.Name -replace '\s','')"; Type = "Blizzard" }
+        }
+    }
+
+    # 2. COMPARACIÓN CON EL ARCHIVO .INC
+    $TotalActual = $allGames.Count
+    $TotalPrevio = 0
+    
+    if (Test-Path $IncFile) {
+        $IncContent = Get-Content $IncFile -Raw
+        if ($IncContent -match 'TotalGames=(\d+)') {
+            $TotalPrevio = [int]$Matches[1]
+        }
+    }
+
+    # 3. ACCIÓN SI HAY CAMBIOS
+    if ($TotalActual -ne $TotalPrevio) {
+        $Timestamp = Get-Date -Format "HH:mm:ss"
+        Write-Host "[$Timestamp] Cambio detectado: $TotalPrevio -> $TotalActual. Actualizando..." -ForegroundColor Yellow
         
-        # 2. Conteo Epic
-        $epicCount = 0
-        if (Test-Path $epicManifestPath) {
-            $epicCount = (Get-ChildItem $epicManifestPath -Filter "*.item" -ErrorAction SilentlyContinue).Count
-        }
-
-        # 3. Lógica Blizzard (Recuperada y Corregida)
-        $bnetCount = 0
-        if (Test-Path $bnetPath) {
-            # Aquí reintegramos la lógica de filtrado que tenías en el script principal para consistencia
-            $bnetGames = Get-ChildItem -Path $bnetPath -Directory -ErrorAction SilentlyContinue | 
-            Where-Object { $_.Name -notmatch "patch|temp|\.data|Builders" }
-            $bnetCount = $bnetGames.Count
-        }
-
-        $totalCount = $steamCount + $epicCount + $bnetCount
-
-        # 4. LÓGICA DE DETECCIÓN
-        if ($totalCount -ne $lastTotalCount) {
-            
-            if ($lastTotalCount -eq 0) {
-                $lastTotalCount = $totalCount
-                Write-Host "[$currentTimestamp] [v] Estado Inicial: $totalCount juegos (S:$steamCount | E:$epicCount | B:$bnetCount)" -ForegroundColor DarkGray
-            } 
-            else {
-                $dif = $totalCount - $lastTotalCount
-                $msg = if ($dif -gt 0) { "NUEVO JUEGO DETECTADO" } else { "JUEGO ELIMINADO" }
-                
-                Write-Host "`n[$currentTimestamp] [!] $msg" -ForegroundColor Yellow -NoNewline
-                Write-Host " (Total: $totalCount)" -ForegroundColor White
-                Write-Host "    Detalle: Steam($steamCount) | Epic($epicCount) | Blizzard($bnetCount)" -ForegroundColor DarkCyan
-                
-                Write-Host "    Preparando entorno y actualizando..." -ForegroundColor Gray
-                Start-Sleep -Seconds 2
-                
-                if (Test-Path $mainScript) {
-                    # Ejecución del script principal
-                    & $mainScript
-                    Write-Host "    [$((Get-Date).ToString('HH:mm:ss'))] [OK] Grid y Rainmeter actualizados.`n" -ForegroundColor Green
-                }
-                else {
-                    Write-Host "    [X] ERROR: No se encontró el script en $mainScript" -ForegroundColor Red
-                }
-                
-                $lastTotalCount = $totalCount
-            }
+        if (Test-Path $UpdateScript) {
+            # Se lanza en modo oculto para no interrumpir
+            Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -File `"$UpdateScript`"" -WindowStyle Hidden
         }
     }
-    catch {
-        Write-Host "`n[$currentTimestamp] [!] ERROR EN EL MONITOR: $($_.Exception.Message)" -ForegroundColor Red
-    }
 
-    [System.GC]::Collect()
-    Start-Sleep -Seconds 20
+    # Pausa antes de la siguiente revisión
+    Start-Sleep -Seconds $Intervalo
 }
