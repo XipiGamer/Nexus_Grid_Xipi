@@ -348,7 +348,6 @@ Y=$posY
 PreserveAspectRatio=1
 ImageAlpha=210
 LeftMouseUpAction=$action
-ToolTipText=$($game.Name)
 Group=Games
 MouseOverAction=[!SetOption #CURRENTSECTION# ImageAlpha 255][!SetVariable NombreJuego `"$($game.Name)`"][!UpdateMeter *][!Redraw]
 MouseLeaveAction=[!SetOption #CURRENTSECTION# ImageAlpha 210][!SetVariable NombreJuego `"`"][!UpdateMeter *][!Redraw]
@@ -365,7 +364,7 @@ Group=Games
 DynamicVariables=1
 "
     $count++
-    if ($ModoGrid -eq "Manual" -and $count -ge 50) { break }
+    if ($ModoGrid -eq "Manual" -and $count -ge 100) { break }
 }
 # ... (El resto del guardado del archivo y Refresh de Rainmeter) ...
 

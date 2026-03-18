@@ -11,7 +11,8 @@ ValidarInstanciaUnica() {
 }
 
 ; --- CONFIGURACIÓN ---
-rutaScript := A_ScriptDir . "\UpdateMini.ps1"
+rutaBase := "H:\proyectos\Nexus_Grid_Xipi"
+rutaScript := rutaBase . "\UpdateMini.ps1"
 rutaPowerShell := "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 rutaInc := "C:\Users\chipi\Documents\Rainmeter\Skins\Mini-Steam Launcher\@Resources\SteamGames.inc"
 
