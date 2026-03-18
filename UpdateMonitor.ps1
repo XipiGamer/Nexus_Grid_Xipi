@@ -2,10 +2,10 @@
 # CONFIGURACIÓN DE RUTAS Y TIEMPOS
 # ==========================================
 $IncFile = "C:\Users\chipi\Documents\Rainmeter\Skins\Mini-Steam Launcher\@Resources\SteamGames.inc"
-$UpdateScript = "H:\proyectos\UpdateMini.ps1"
+$UpdateScript = "H:\proyectos\Nexus_Grid_Xipi\UpdateMini.ps1"
 $libraryConfig = "C:\Program Files (x86)\Steam\steamapps\libraryfolders.vdf"
 $blizzPath = "H:\BlizardLibrary"
-$Intervalo = 120 # Revisa cada 2 minutos
+$Intervalo = 1 # Revisa cada 1 segundo
 $manualExclusions = @(431960) 
 
 Write-Host "Vigilante de librerías iniciado (segundo plano)..." -ForegroundColor Cyan

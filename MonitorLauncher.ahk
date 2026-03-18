@@ -3,7 +3,7 @@
 
 ; --- RUTA AL MONITOR ---
 ; Usamos la ruta que ya tienes establecida para el monitor
-rutaMonitor := "C:\Users\chipi\Documents\Rainmeter\Skins\Mini-Steam Launcher\@Resources\UpdateMonitor.ps1"
+rutaMonitor := "H: \proyectos\Nexus_Grid_Xipi\UpdateMonitor.ps1"
 
 ; --- EJECUCIÓN SILENCIOSA ---
 ; -WindowStyle Hidden: asegura que PowerShell no muestre la ventana negra
