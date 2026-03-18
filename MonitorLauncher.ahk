@@ -1,9 +1,9 @@
 #Requires AutoHotkey v2.0
-#NoTrayIcon ; Elimina el icono de la bandeja de entrada para que sea invisible
+#SingleInstance Force
 
 ; --- RUTA AL MONITOR ---
 ; Usamos la ruta que ya tienes establecida para el monitor
-rutaMonitor := "H: \proyectos\Nexus_Grid_Xipi\UpdateMonitor.ps1"
+rutaMonitor := "H:\proyectos\Nexus_Grid_Xipi\UpdateMonitor.ps1"
 
 ; --- EJECUCIÓN SILENCIOSA ---
 ; -WindowStyle Hidden: asegura que PowerShell no muestre la ventana negra

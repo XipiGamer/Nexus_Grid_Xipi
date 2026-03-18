@@ -12,7 +12,7 @@ ValidarInstanciaUnica() {
 
 ; --- CONFIGURACIÓN ---
 rutaBase := "H:\proyectos\Nexus_Grid_Xipi"
-rutaScript := rutaBase . "\UpdateMini.ps1"
+rutaScript := rutaBase . "\Core_Browser.ps1" ; Ruta al script que cambiará el modo (Auto/Manual)
 rutaPowerShell := "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 rutaInc := "C:\Users\chipi\Documents\Rainmeter\Skins\Mini-Steam Launcher\@Resources\SteamGames.inc"
 
