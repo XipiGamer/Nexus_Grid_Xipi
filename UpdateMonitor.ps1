@@ -1,7 +1,7 @@
 # ==========================================
 # CONFIGURACIÓN DE RUTAS Y TIEMPOS
 # ==========================================
-$IncFile = "C:\Users\chipi\Documents\Rainmeter\Skins\Mini-Steam Launcher\@Resources\SteamGames.inc"
+$IncFile = "H:\proyectos\Nexus_Grid_Xipi\@Resources\SteamGames.inc"
 $UpdateScript = "H:\proyectos\Nexus_Grid_Xipi\Core_Browser.ps1"
 $libraryConfig = "C:\Program Files (x86)\Steam\steamapps\libraryfolders.vdf"
 $blizzPath = "H:\BlizardLibrary"

@@ -5,13 +5,13 @@
 param([string]$NuevoModo) 
 
 Add-Type -AssemblyName System.Drawing
-$skinName      = "Mini-Steam Launcher"
+$skinName      = "Nexus_Grid_Xipi"
 $outputDir     = "$env:USERPROFILE\Documents\Rainmeter\Skins\$skinName\@Resources"
 $outputFile    = Join-Path $outputDir "SteamGames.inc"
 $steamBase     = "C:\Program Files (x86)\Steam"
 $steamCache    = "$steamBase\appcache\librarycache"
 $libraryConfig = "$steamBase\steamapps\libraryfolders.vdf"
-$configFile    = "H:\proyectos\config.ini"
+$configFile    = "H:\proyectos\Nexus_Grid_Xipi\config.ini"
 
 $CWidth, $CHeight, $Spacing = 160, 240, 20
 $ColsAuto = 14 
