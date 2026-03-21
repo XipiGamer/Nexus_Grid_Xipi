@@ -5,13 +5,13 @@
 param([string]$NuevoModo) 
 
 Add-Type -AssemblyName System.Drawing
-$skinName      = "Nexus_Grid_Xipi"
-$outputDir     = "$env:USERPROFILE\Documents\Rainmeter\Skins\$skinName\@Resources"
-$outputFile    = Join-Path $outputDir "SteamGames.inc"
-$steamBase     = "C:\Program Files (x86)\Steam"
-$steamCache    = "$steamBase\appcache\librarycache"
+$skinName = "Nexus_Grid_Xipi"
+$outputDir = "$env:USERPROFILE\Documents\Rainmeter\Skins\$skinName\@Resources"
+$outputFile = Join-Path $outputDir "SteamGames.inc"
+$steamBase = "C:\Program Files (x86)\Steam"
+$steamCache = "$steamBase\appcache\librarycache"
 $libraryConfig = "$steamBase\steamapps\libraryfolders.vdf"
-$configFile    = "H:\proyectos\Nexus_Grid_Xipi\config.ini"
+$configFile = "H:\proyectos\Nexus_Grid_Xipi\config.ini"
 
 $CWidth, $CHeight, $Spacing = 160, 240, 20
 $ColsAuto = 14 
@@ -23,11 +23,6 @@ $manualInclusions = @() # ID de ejemplo (last of us ii) <--- busca directamente 
 #añade su ID a esta lista y el script lo bajará de internet (prioridad máxima) en lugar de usar la imagen local (si existe)
 
 ##### Modo Grid: Auto o Manual (Toggle) #####
-
-# Definimos el parámetro al inicio de tu script si no lo tiene:
-# param([string]$ForzarModo = "") 
-
-
 
 
 # 2. Valor por defecto (si el archivo no existe)
@@ -67,16 +62,17 @@ if (Test-Path $configFile) {
 function Get-SteamGridDBImage {
     param ([string]$GameName, [string]$ApiKey)
     if (-not $ApiKey) { return $null }
-    $cleanName = ($GameName -split " - ")[0] -replace "™|®|:|\(.*?\)","" -replace "\s+", " "
+    $cleanName = ($GameName -split " - ")[0] -replace "™|®|:|\(.*?\)", "" -replace "\s+", " "
     $encodedName = [Uri]::EscapeDataString($cleanName.Trim())
     try {
-        $search = Invoke-RestMethod -Uri "https://www.steamgriddb.com/api/v2/search/autocomplete/$encodedName" -Headers @{"Authorization" = "Bearer $ApiKey"}
+        $search = Invoke-RestMethod -Uri "https://www.steamgriddb.com/api/v2/search/autocomplete/$encodedName" -Headers @{"Authorization" = "Bearer $ApiKey" }
         if ($search.success -and $search.data.Count -gt 0) {
             $gameId = $search.data[0].id
-            $grids = Invoke-RestMethod -Uri "https://www.steamgriddb.com/api/v2/grids/game/$($gameId)?dimensions=600x900" -Headers @{"Authorization" = "Bearer $ApiKey"}
+            $grids = Invoke-RestMethod -Uri "https://www.steamgriddb.com/api/v2/grids/game/$($gameId)?dimensions=600x900" -Headers @{"Authorization" = "Bearer $ApiKey" }
             if ($grids.success -and $grids.data.Count -gt 0) { return $grids.data[0].url }
         }
-    } catch { return $null }
+    }
+    catch { return $null }
 }
 
 function Get-ManualPriorityImage {
@@ -94,7 +90,8 @@ function Get-ManualPriorityImage {
         try {
             Invoke-WebRequest -Uri $url -OutFile $targetFile -TimeoutSec 10
             return $true 
-        } catch { return $false }
+        }
+        catch { return $false }
     }
     return $false
 }
@@ -188,8 +185,8 @@ foreach ($game in $allGames) {
             $gameFolder = Join-Path $steamCache $game.ID
             if (Test-Path $gameFolder) {
                 $foundFile = Get-ChildItem -Path $gameFolder -Filter "*.jpg" -Recurse | 
-                             Where-Object { $_.Length -gt 20kb -and $_.Length -lt 80kb -and ($_.Name -like "*library*" -or $_.Name -like "*capsule*") } | 
-                             Select-Object -First 1
+                Where-Object { $_.Length -gt 20kb -and $_.Length -lt 80kb -and ($_.Name -like "*library*" -or $_.Name -like "*capsule*") } | 
+                Select-Object -First 1
                 
                 if ($foundFile) {
                     Copy-Item -Path $foundFile.FullName -Destination $localImg -Force
@@ -206,7 +203,8 @@ foreach ($game in $allGames) {
                 Invoke-WebRequest -Uri $url -OutFile $localImg -UserAgent "Mozilla/5.0" -TimeoutSec 5 -ErrorAction Stop
                 Write-Host " EXITOSO (Epic CDN): $($game.Name)" -ForegroundColor Cyan
                 $found = $true
-            } catch {}
+            }
+            catch {}
         }
         #**** Búsqueda BLIZZARD ****
 
@@ -260,7 +258,8 @@ foreach ($game in $allGames) {
                     Invoke-WebRequest -Uri $sgdbUrl -OutFile $localImg -TimeoutSec 10
                     Write-Host " EXITOSO (SteamGridDB): $($game.Name)" -ForegroundColor Yellow
                     $found = $true
-                } catch {}
+                }
+                catch {}
             }
         }
         
