@@ -331,6 +331,65 @@ foreach ($game in ($allGames | Sort-Object Name)) {
     }
 
 
+
+    # --- INICIO DE INTEGRACIÓN IMAGEMAGICK 
+    # --- CONFIGURACIÓN DE RUTAS ---
+    $absolutePath = "$PSScriptRoot\@Resources\$($game.ID).jpg"
+    $processedPath = "$PSScriptRoot\@Resources\cache\$($game.ID)_blur.png"
+    $relativeProcessed = "#@#cache\$($game.ID)_blur.png"
+    
+    # Crear carpeta de caché si no existe
+    if (!(Test-Path "$PSScriptRoot\@Resources\cache")) { 
+        New-Item -ItemType Directory -Path "$PSScriptRoot\@Resources\cache" -Force > $null 
+    }
+    
+    # --- LÓGICA DE GENERACIÓN ---
+    if (Test-Path $absolutePath) {
+        if (!(Test-Path $processedPath)) {
+            Write-Host "Generando carátula con bordes suaves: $($game.ID)" -ForegroundColor Yellow
+            
+            # Argumentos: Recorte rectangular con esquinas de radio 25 y blur de 10
+            # --- LÓGICA DE GENERACIÓN ---
+            if (Test-Path $absolutePath) {
+                if (!(Test-Path $processedPath)) {
+                    Write-Host "Generando carátula: $($game.ID)" -ForegroundColor Yellow
+                    
+                    # Usamos -virtual-pixel transparent y -blur para suavizar los bordes
+                    # sin necesidad de dibujar máscaras que rompan el comando.
+                    $magickArgs = @(
+                        "`"$absolutePath`"",
+                        "-alpha", "set",
+                        "-virtual-pixel", "transparent",
+                        "-channel", "A",
+                        "-blur", "0x12",
+                        "-level", "50%,100%",
+                        "+channel",
+                        "`"$processedPath`""
+                    )
+                    
+                    Start-Process -FilePath "magick" -ArgumentList $magickArgs -NoNewWindow -Wait
+                }
+                $finalImage = $relativeProcessed
+            }
+            
+            # Ejecución directa
+            Start-Process -FilePath "magick" -ArgumentList $magickArgs -NoNewWindow -Wait
+        }
+        else {
+            # Descomenta la siguiente línea si quieres ver qué imágenes ya estaban en caché
+            # Write-Host "Imagen ya en caché: $($game.ID)" -ForegroundColor DarkGray
+        }
+        $finalImage = $relativeProcessed
+    }
+    else {
+        $finalImage = "#@#default.jpg"
+    }
+    # --- FIN DE INTEGRACIÓN ---
+   
+  
+
+
+
     # --- CONSTRUCCIÓN DE LOS METERS ---
     # 1. El Meter de la carátula (Fondo)
     # 2. El Meter del Icono (Superpuesto) usando $game.Type
@@ -348,24 +407,24 @@ H=$CHeight
 X=($posX - 10)
 Y=$posY
 Tile=1
-ImageAlpha=50
+ImageAlpha=20
 Group=Games
 
 [Game$count]
 Meter=Image
-ImageName=#@#$($game.ID).jpg
+ImageName=$finalImage
 ImageNotFound=#@#default.jpg
 W=$CWidth
 H=$CHeight
 X=$posX
 Y=$posY
 PreserveAspectRatio=1
-ImageAlpha=250
+ImageAlpha=220
 LeftMouseUpAction=$action
 Group=Games
-MouseOverAction=[!SetOption Game$count ImageAlpha 255][!SetOption Texture$count ImageAlpha 255][!SetVariable NombreJuego $($q)$($game.Name)$($q)][!SetVariable IconoJuego $($q)#@#Icons\$($game.Type).png$($q)][!UpdateMeter *][!Redraw]
-MouseLeaveAction=[!SetOption Game$count ImageAlpha 150][!SetOption Texture$count ImageAlpha 120][!SetVariable NombreJuego $($q)$($q)][!SetVariable IconoJuego $($q)$($q)][!UpdateMeter *][!Redraw]
-
+TransformationMatrix=1;0;0;1;0;0
+MouseOverAction=[!SetOption Game$count ImageAlpha 255][!SetOption Game$count TransformationMatrix `"1.05;0;0;1.05;$(-$posX * 0.05);$(-$posY * 0.05)`"][!SetOption Texture$count ImageAlpha 120][!SetVariable NombreJuego $($q)$($game.Name)$($q)][!SetVariable IconoJuego $($q)#@#Icons\$($game.Type).png$($q)][!UpdateMeter *][!Redraw]
+MouseLeaveAction=[!SetOption Game$count ImageAlpha 180][!SetOption Game$count TransformationMatrix `"1;0;0;1;0;0`"][!SetOption Texture$count ImageAlpha 20][!SetVariable NombreJuego $($q)$($q)][!SetVariable IconoJuego $($q)$($q)][!UpdateMeter *][!Redraw]
 
 
 [Icon$count]
@@ -398,4 +457,4 @@ if (Test-Path "C:\Program Files\Rainmeter\Rainmeter.exe") {
 }
 
 Write-Host "`nPROCESO TERMINADO - MODO ACTUAL: $ModoGrid" -ForegroundColor Magenta
-Write-Host "`nPROCESO TERMINADO - MODO ACTUAL: $ModoGrid" -ForegroundColor Magenta
+
