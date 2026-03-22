@@ -13,9 +13,9 @@ $steamCache = "$steamBase\appcache\librarycache"
 $libraryConfig = "$steamBase\steamapps\libraryfolders.vdf"
 $configFile = "H:\proyectos\Nexus_Grid_Xipi\config.ini"
 
-$CWidth, $CHeight, $Spacing = 160, 240, 20
-$ColsAuto = 14 
-$layoutSchema = @(14, 4, 4, 14, 14)
+$CWidth, $CHeight, $Spacing = 100, 180, 20
+$ColsAuto = 21 
+$layoutSchema = @(21, 8, 7, 7, 21)
 
 $manualExclusions = @(431960) #wallpaper engine
 $manualInclusions = @() # ID de ejemplo (last of us ii) <--- busca directamente en SteamgridDB
@@ -334,8 +334,23 @@ foreach ($game in ($allGames | Sort-Object Name)) {
     # --- CONSTRUCCIÓN DE LOS METERS ---
     # 1. El Meter de la carátula (Fondo)
     # 2. El Meter del Icono (Superpuesto) usando $game.Type
-    
+    # Definimos la comilla doble para evitar errores de escape en PowerShell
+    # Definimos la comilla doble para evitar errores de escape en PowerShell
+    $q = '"'
+
     $incContent += "
+
+[Texture$count]
+Meter=Image
+ImageName=#@#texturas\texture1.png
+W=($CWidth + 20)
+H=$CHeight
+X=($posX - 10)
+Y=$posY
+Tile=1
+ImageAlpha=50
+Group=Games
+
 [Game$count]
 Meter=Image
 ImageName=#@#$($game.ID).jpg
@@ -345,11 +360,13 @@ H=$CHeight
 X=$posX
 Y=$posY
 PreserveAspectRatio=1
-ImageAlpha=210
+ImageAlpha=250
 LeftMouseUpAction=$action
 Group=Games
-MouseOverAction=[!SetOption #CURRENTSECTION# ImageAlpha 255][!SetVariable NombreJuego `"$($game.Name)`"][!UpdateMeter *][!Redraw]
-MouseLeaveAction=[!SetOption #CURRENTSECTION# ImageAlpha 210][!SetVariable NombreJuego `"`"][!UpdateMeter *][!Redraw]
+MouseOverAction=[!SetOption Game$count ImageAlpha 255][!SetOption Texture$count ImageAlpha 255][!SetVariable NombreJuego $($q)$($game.Name)$($q)][!SetVariable IconoJuego $($q)#@#Icons\$($game.Type).png$($q)][!UpdateMeter *][!Redraw]
+MouseLeaveAction=[!SetOption Game$count ImageAlpha 150][!SetOption Texture$count ImageAlpha 120][!SetVariable NombreJuego $($q)$($q)][!SetVariable IconoJuego $($q)$($q)][!UpdateMeter *][!Redraw]
+
+
 
 [Icon$count]
 Meter=Image
@@ -358,7 +375,7 @@ W=24
 H=24
 X=($posX + $CWidth - 28)
 Y=($posY + 4)
-ImageAlpha=255
+Hidden=1
 Group=Games
 DynamicVariables=1
 "
@@ -372,7 +389,7 @@ DynamicVariables=1
 # Preparamos el encabezado con el modo que decidió el switch
 $header = "[Variables]`nTotalGames=$count`nUltimaFecha=$((Get-Date).ToString("d 'de' MMMM 'del' yyyy"))`nVariableModo=$ModoGrid`n"
 
-# Escribimos el archivo (asegurando UTF8 para Rainmeter
+# Escribimos el archivo (asegurando UTF8 para Rainmeter)
 ($header + $incContent) | Out-File -FilePath $outputFile -Encoding unicode -Force
 
 # Refrescamos el skin para ver los cambios al instante
@@ -380,4 +397,5 @@ if (Test-Path "C:\Program Files\Rainmeter\Rainmeter.exe") {
     & "C:\Program Files\Rainmeter\Rainmeter.exe" !Refresh "$skinName"
 }
 
+Write-Host "`nPROCESO TERMINADO - MODO ACTUAL: $ModoGrid" -ForegroundColor Magenta
 Write-Host "`nPROCESO TERMINADO - MODO ACTUAL: $ModoGrid" -ForegroundColor Magenta
