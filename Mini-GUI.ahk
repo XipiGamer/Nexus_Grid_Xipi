@@ -4,7 +4,7 @@
 ; --- BLOQUEO DE INSTANCIA ---
 ValidarInstanciaUnica()
 ValidarInstanciaUnica() {
-    handle := DllCall("CreateMutex", "Ptr", 0, "Int", 1, "Str", "Global\MiniSteamPopupMutex", "Ptr")
+    static mutex := DllCall("CreateMutex", "Ptr", 0, "Int", 1, "Str", "Global\MiniSteamPopupMutex", "Ptr")
     if (A_LastError = 183) {
         ExitApp()
     }
@@ -12,21 +12,18 @@ ValidarInstanciaUnica() {
 
 ; --- CONFIGURACIÓN ---
 rutaBase := "H:\proyectos\Nexus_Grid_Xipi"
-rutaScript := rutaBase . "\Core_Browser.ps1" ; Ruta al script que cambiará el modo (Auto/Manual)
+rutaScript := rutaBase . "\Core_Browser.ps1"
 rutaPowerShell := "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 rutaInc := "H:\proyectos\Nexus_Grid_Xipi\@Resources\SteamGames.inc"
 
-colorFondo := "ffffff"
-colorTexto := "C18DAB"
-colorauto := "ac0e0e"
-colormanual := "2b9f5b"
+colorFondo := "bb9373"
+colorTexto := "361a2b"
+colorauto := "740a74"
+colormanual := "16a04f"
 
-; --- INICIALIZACIÓN DE VARIABLES (Evita el Warning) ---
 ModoActual := "Auto"
-ColorVariable := colormanual ; Valor por defecto
 TextoVariable := ""
 
-; --- VALIDACIÓN INICIAL ---
 try {
     if FileExist(rutaInc) {
         contenido := FileRead(rutaInc)
@@ -52,26 +49,32 @@ if (ModoActual = "Auto") {
 TxtFijo := myGui.Add("Text", "x12 y0 h34 +0x200 +0x100 c" . colorTexto, "Cambiar a 󰁔 ")
 TxtVar := myGui.Add("Text", "x+0 y0 h34 w90 +0x200 +0x100 c" . ColorVariable, TextoVariable)
 
-; --- APLICAR ESQUINAS REDONDEADAS (SOLO ABAJO) ---
-myGui.Show("w200 h34 xCenter y0 NoActivate Hide")
+; --- CÁLCULO DE POSICIÓN INFERIOR ---
+; Calculamos el borde inferior de la pantalla (restando la barra de tareas si es necesario)
+MonitorGetWorkArea(, , , , &WorkAreaBottom)
+anchoGui := 200
+altoGui := 34
+posX := (A_ScreenWidth // 2) - (anchoGui // 2)
+posY := WorkAreaBottom - altoGui
 
-; El truco: Empezamos en Y = -10 para que las esquinas superiores queden fuera del área visible
-; (HWND, X1, Y1, X2, Y2, AnchoCurva, AltoCurva)
-radioCurva := 10
-reducirEsquinas := DllCall("Gdi32.dll\CreateRoundRectRgn", "Int", 0, "Int", -10, "Int", 200, "Int", 34, "Int", radioCurva, "Int", radioCurva)
+myGui.Show("w" . anchoGui . " h" . altoGui . " x" . posX . " y" . posY . " NoActivate Hide")
+
+; --- APLICAR ESQUINAS REDONDEADAS (SOLO ARRIBA) ---
+; Ahora el recorte empieza en 0 y termina en +10 de alto para ocultar el redondeo inferior
+radioCurva := 12
+reducirEsquinas := DllCall("Gdi32.dll\CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", anchoGui, "Int", altoGui + 15, "Int", radioCurva, "Int", radioCurva)
 DllCall("User32.dll\SetWindowRgn", "UInt", myGui.Hwnd, "UInt", reducirEsquinas, "UInt", 1)
 
 ; --- LÓGICA DE FUNDIDO ---
 WinSetTransparent(0, myGui.Hwnd)
 myGui.Show("NoActivate")
 
-Loop 30 {
-    valorOpacidad := Floor(A_Index * 8.5)
-    WinSetTransparent(valorOpacidad, myGui.Hwnd)
+Loop 20 {
+    WinSetTransparent(Floor(A_Index * 12.75), myGui.Hwnd)
     Sleep 5
 }
 
-; --- CURSOR (MANO) ---
+; --- CURSOR Y EVENTOS ---
 OnMessage(0x0020, WM_SETCURSOR)
 WM_SETCURSOR(wParam, lParam, msg, hwnd) {
     if (wParam = TxtFijo.Hwnd || wParam = TxtVar.Hwnd) {
@@ -83,16 +86,16 @@ WM_SETCURSOR(wParam, lParam, msg, hwnd) {
 TxtFijo.OnEvent("Click", EjecutarCambio)
 TxtVar.OnEvent("Click", EjecutarCambio)
 
-; --- AUTO-CIERRE ---
 SetTimer(CerrarPorInactividad, 1500)
 CerrarPorInactividad() {
-    MouseGetPos(, , &id)
-    if (id != myGui.Hwnd) {
-        ExitApp()
+    if !WinActive(myGui.Hwnd) {
+        MouseGetPos(, , &id)
+        if (id != myGui.Hwnd) {
+            ExitApp()
+        }
     }
 }
 
-; --- ACCIÓN ---
 EjecutarCambio(*) {
     global ModoActual
     SetTimer(CerrarPorInactividad, 0)
@@ -103,5 +106,6 @@ EjecutarCambio(*) {
         ExitApp()
     } catch Error as e {
         MsgBox("Error: " . e.Message)
+        ExitApp()
     }
 }

@@ -14,8 +14,8 @@ $libraryConfig = "$steamBase\steamapps\libraryfolders.vdf"
 $configFile = "H:\proyectos\Nexus_Grid_Xipi\config.ini"
 
 $CWidth, $CHeight, $Spacing = 100, 180, 20
-$ColsAuto = 21 
-$layoutSchema = @(21, 8, 7, 7, 21)
+$ColsAuto = 19
+$layoutSchema = @( 9, 9, 7, 6, 6, 19)
 
 $manualExclusions = @(431960) #wallpaper engine
 $manualInclusions = @() # ID de ejemplo (last of us ii) <--- busca directamente en SteamgridDB
