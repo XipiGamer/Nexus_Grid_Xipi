@@ -2,7 +2,7 @@
 # 1. Configuración de Rutas y Variables
 # ==========================================
 # 1. Parámetro de entrada
-param([string]$NuevoModo) 
+param([string]$NuevoModo, [switch]$GenerateHTML) 
 
 Add-Type -AssemblyName System.Drawing
 $skinName = "Nexus_Grid_Xipi"
@@ -14,8 +14,8 @@ $libraryConfig = "$steamBase\steamapps\libraryfolders.vdf"
 $configFile = "H:\proyectos\Nexus_Grid_Xipi\config.ini"
 
 $CWidth, $CHeight, $Spacing = 100, 180, 20
-$ColsAuto = 19
-$layoutSchema = @( 9, 9, 7, 6, 6, 19)
+$ColsAuto = 12
+$layoutSchema = @( 3, 3, 3, 3, 18, 18)
 
 $manualExclusions = @(431960) #wallpaper engine
 $manualInclusions = @() # ID de ejemplo (last of us ii) <--- busca directamente en SteamgridDB
@@ -397,7 +397,7 @@ foreach ($game in ($allGames | Sort-Object Name)) {
     # Definimos la comilla doble para evitar errores de escape en PowerShell
     $q = '"'
 
-    $incContent += "
+$incContent += @"
 
 [Texture$count]
 Meter=Image
@@ -423,9 +423,8 @@ ImageAlpha=220
 LeftMouseUpAction=$action
 Group=Games
 TransformationMatrix=1;0;0;1;0;0
-MouseOverAction=[!SetOption Game$count ImageAlpha 255][!SetOption Game$count TransformationMatrix `"1.05;0;0;1.05;$(-$posX * 0.05);$(-$posY * 0.05)`"][!SetOption Texture$count ImageAlpha 120][!SetVariable NombreJuego $($q)$($game.Name)$($q)][!SetVariable IconoJuego $($q)#@#Icons\$($game.Type).png$($q)][!UpdateMeter *][!Redraw]
-MouseLeaveAction=[!SetOption Game$count ImageAlpha 180][!SetOption Game$count TransformationMatrix `"1;0;0;1;0;0`"][!SetOption Texture$count ImageAlpha 20][!SetVariable NombreJuego $($q)$($q)][!SetVariable IconoJuego $($q)$($q)][!UpdateMeter *][!Redraw]
-
+MouseOverAction=[!SetOption Game$count ImageAlpha 255][!SetOption Game$count TransformationMatrix "1.05;0;0;1.05;$(-$posX * 0.05);$(-$posY * 0.05)"][!SetOption Texture$count ImageAlpha 120][!SetVariable NombreJuego $($q)$($game.Name)$($q)][!SetVariable IconoJuego $($q)#@#Icons\$($game.Type).png$($q)][!UpdateMeterGroup "GrupoInfo"][!Redraw]
+MouseLeaveAction=[!SetOption Game$count ImageAlpha 180][!SetOption Game$count TransformationMatrix "1;0;0;1;0;0"][!SetOption Texture$count ImageAlpha 20][!SetVariable NombreJuego "" ][!SetVariable IconoJuego "" ][!UpdateMeterGroup "GrupoInfo"][!Redraw]
 
 [Icon$count]
 Meter=Image
@@ -437,7 +436,7 @@ Y=($posY + 4)
 Hidden=1
 Group=Games
 DynamicVariables=1
-"
+"@
     $count++
     if ($ModoGrid -eq "Manual" -and $count -ge 100) { break }
 }
@@ -456,5 +455,423 @@ if (Test-Path "C:\Program Files\Rainmeter\Rainmeter.exe") {
     & "C:\Program Files\Rainmeter\Rainmeter.exe" !Refresh "$skinName"
 }
 
-Write-Host "`nPROCESO TERMINADO - MODO ACTUAL: $ModoGrid" -ForegroundColor Magenta
+# ==========================================
+# 6. Generación del HTML para Gallery (YASB)
+# ==========================================
 
+# ==========================================
+# 6. Generación del HTML para Gallery (YASB)
+# ==========================================
+
+function Generate-GalleryHTML {
+    param(
+        [array]$Games,
+        [string]$OutputDir,
+        [string]$SkinName
+    )
+
+    $htmlPath = Join-Path $OutputDir "gallery.html"
+
+    # Carpeta de imágenes accesible por el HTML
+    $galleryImgDir = Join-Path $OutputDir "gallery_images"
+    if (!(Test-Path $galleryImgDir)) {
+        New-Item -ItemType Directory -Path $galleryImgDir -Force | Out-Null
+    }
+
+    # Copiar iconos de plataforma a gallery_images
+    $iconsDir = Join-Path $OutputDir "Icons"
+    foreach ($platform in @("Steam", "Epic", "Blizzard")) {
+        $srcIcon  = Join-Path $iconsDir "$platform.png"
+        $destIcon = Join-Path $galleryImgDir "$platform.png"
+        if ((Test-Path $srcIcon) -and !(Test-Path $destIcon)) {
+            Copy-Item $srcIcon $destIcon -Force
+        }
+    }
+
+    # Construir array JSON de juegos
+    $cardsJson = ($Games | Sort-Object Name | ForEach-Object {
+        $game = $_
+
+        # Imagen: primero intentar cache blur, luego .jpg original
+        $cacheImg  = Join-Path $OutputDir "cache\$($game.ID)_blur.png"
+        $srcImg    = Join-Path $OutputDir "$($game.ID).jpg"
+        $destName  = "$($game.ID).jpg"
+        $imgSrc    = "./gallery_images/$destName"
+
+        if (Test-Path $cacheImg) {
+            $destName = "$($game.ID)_blur.png"
+            $imgSrc   = "./gallery_images/$destName"
+            $destImg  = Join-Path $galleryImgDir $destName
+            if (!(Test-Path $destImg)) { Copy-Item $cacheImg $destImg -Force }
+        }
+        elseif (Test-Path $srcImg) {
+            $destImg = Join-Path $galleryImgDir $destName
+            if (!(Test-Path $destImg)) { Copy-Item $srcImg $destImg -Force }
+        }
+        else {
+            $imgSrc = "./default.jpg"
+        }
+
+        # URI de lanzamiento
+        $uri = switch ($game.Type) {
+            "Steam"    { "steam://rungameid/$($game.ID)" }
+            "Epic"     { $game.LaunchURI }
+            "Blizzard" { $game.SourcePath -replace '\\', '/' }
+            default    { "" }
+        }
+
+        $name = $game.Name -replace '"', '\"' -replace "'", "\'"
+        $type = $game.Type
+
+        "{`"id`":`"$($game.ID)`",`"name`":`"$name`",`"type`":`"$type`",`"img`":`"$imgSrc`",`"uri`":`"$uri`"}"
+    }) -join ",`n"
+
+    $totalGames = $Games.Count
+
+    $html = @"
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus Grid — Gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #0d0d0f;
+    --surface:    #131316;
+    --border:     #1e1e24;
+    --accent:     #c18dab;
+    --accent2:    #ff9f50;
+    --text:       #e0e0e0;
+    --muted:      #555560;
+    --steam:      #1a9fff;
+    --epic:       #2ecc71;
+    --blizzard:   #00aeff;
+    --card-w:     110px;
+    --card-h:     165px;
+    --gap:        14px;
+    --radius:     10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: transparent;
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    background: rgba(13, 13, 15, 0.90);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  #topbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 16px;
+    background: rgba(19, 19, 22, 0.85);
+    border-bottom: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    flex-shrink: 0;
+    -webkit-app-region: drag;
+  }
+
+  /* Elementos dentro del topbar no deben ser arrastrables */
+  #topbar > * { -webkit-app-region: no-drag; }
+
+  #logo {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent2);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  #search-wrap { flex: 1; position: relative; max-width: 380px; }
+  #search-wrap svg {
+    position: absolute; left: 10px; top: 50%;
+    transform: translateY(-50%); opacity: 0.4; pointer-events: none;
+  }
+  #search {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 7px 12px 7px 34px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #search:focus { border-color: var(--accent); }
+  #search::placeholder { color: var(--muted); }
+
+  #filters { display: flex; gap: 6px; flex-shrink: 0; }
+  .filter-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 0.18s;
+    text-transform: uppercase;
+  }
+  .filter-btn:hover  { border-color: var(--accent); color: var(--accent); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #0d0d0f; }
+  .filter-btn[data-type="Steam"].active   { background: var(--steam);    border-color: var(--steam);    color: #fff; }
+  .filter-btn[data-type="Epic"].active    { background: var(--epic);     border-color: var(--epic);     color: #fff; }
+  .filter-btn[data-type="Blizzard"].active{ background: var(--blizzard); border-color: var(--blizzard); color: #fff; }
+
+  #count { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  #count span { color: var(--accent2); font-weight: 600; }
+
+  /* Botón cerrar */
+  #btn-close {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1;
+    width: 28px; height: 24px;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #btn-close:hover { background: #c0392b; border-color: #c0392b; color: #fff; }
+
+  /* Grid */
+  #grid-wrap {
+    overflow: visible;
+    padding: 20px;
+  }
+
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, var(--card-w));
+    gap: var(--gap);
+    justify-content: start;
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    width: var(--card-w); height: var(--card-h);
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.22s cubic-bezier(.34,1.4,.64,1), box-shadow 0.22s;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    animation: fadeIn 0.3s ease both;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .card:hover {
+    transform: scale(1.07) translateY(-3px);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.55), 0 0 0 1px var(--accent);
+    z-index: 10;
+  }
+  .card > .cover { width: 100%; height: 100%; object-fit: cover; display: block; transition: filter 0.22s; }
+  .card:hover > .cover { filter: brightness(1.08); }
+
+  /* Badge con icono PNG */
+  .badge {
+    position: absolute; top: 5px; right: 5px;
+    width: 20px; height: 20px;
+    border-radius: 5px;
+    overflow: hidden;
+    opacity: 0.9;
+    backdrop-filter: blur(4px);
+    background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .badge img { width: 14px; height: 14px; object-fit: contain; }
+
+  /* Tooltip nombre */
+  .card-tooltip {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.88) 60%);
+    padding: 18px 6px 6px;
+    font-size: 10px; font-weight: 500; color: #fff; line-height: 1.2;
+    opacity: 0; transform: translateY(4px);
+    transition: opacity 0.18s, transform 0.18s; pointer-events: none;
+  }
+  .card:hover .card-tooltip { opacity: 1; transform: translateY(0); }
+
+  #empty { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; color: var(--muted); }
+  #empty.visible { display: flex; }
+  #empty svg { opacity: 0.3; }
+  #empty p { font-size: 14px; }
+
+  #grid-wrap { scrollbar-gutter: stable; }
+  .card:nth-child(1)    { animation-delay: 0ms }
+  .card:nth-child(2)    { animation-delay: 15ms }
+  .card:nth-child(3)    { animation-delay: 30ms }
+  .card:nth-child(4)    { animation-delay: 45ms }
+  .card:nth-child(5)    { animation-delay: 60ms }
+  .card:nth-child(6)    { animation-delay: 75ms }
+  .card:nth-child(7)    { animation-delay: 90ms }
+  .card:nth-child(8)    { animation-delay: 105ms }
+  .card:nth-child(9)    { animation-delay: 120ms }
+  .card:nth-child(10)   { animation-delay: 135ms }
+  .card:nth-child(n+11) { animation-delay: 150ms }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div id="logo">󰊴 Nexus Grid</div>
+    <div id="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input id="search" type="text" placeholder="Buscar juego..." autocomplete="off" spellcheck="false">
+    </div>
+    <div id="filters">
+      <button class="filter-btn active" data-type="All">Todos</button>
+      <button class="filter-btn" data-type="Steam">Steam</button>
+      <button class="filter-btn" data-type="Epic">Epic</button>
+      <button class="filter-btn" data-type="Blizzard">Blizzard</button>
+    </div>
+    <div id="count"><span id="visible-count">$totalGames</span> / $totalGames juegos</div>
+    <button id="btn-close" title="Cerrar (Esc)">✕</button>
+  </div>
+  <div id="grid-wrap">
+    <div id="grid"></div>
+    <div id="empty">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <p>Sin resultados para esa búsqueda</p>
+    </div>
+  </div>
+</div>
+<script>
+const GAMES = [
+$cardsJson
+];
+const TOTAL    = GAMES.length;
+const grid     = document.getElementById('grid');
+const searchEl = document.getElementById('search');
+const emptyEl  = document.getElementById('empty');
+const countEl  = document.getElementById('visible-count');
+const filterBtns = document.querySelectorAll('.filter-btn');
+let activeFilter = 'All';
+let searchTerm   = '';
+
+function sendToAhk(obj) {
+  if (window.chrome && window.chrome.webview)
+    window.chrome.webview.postMessage(JSON.stringify(obj));
+}
+
+// Ajustar ventana al contenido real del grid
+function fitWindow() {
+  // Esperar un frame para que el DOM tenga las dimensiones correctas
+  requestAnimationFrame(() => {
+    const topbarH  = document.getElementById('topbar').offsetHeight;
+    const gridEl   = document.getElementById('grid');
+    const gridRect = gridEl.getBoundingClientRect();
+    const padding  = 20; // padding del grid-wrap (igual en todos los lados)
+    const rows     = gridEl.children.length > 0 ? gridEl.offsetHeight : 0;
+    const totalH   = topbarH + padding + rows + padding;
+    const totalW   = gridRect.width + padding * 2;
+    sendToAhk({ action: 'resize', w: Math.ceil(totalW), h: Math.ceil(totalH) });
+  });
+}
+
+function renderGrid() {
+  const term = searchTerm.toLowerCase();
+  const filtered = GAMES.filter(g => {
+    const matchType = activeFilter === 'All' || g.type === activeFilter;
+    const matchName = g.name.toLowerCase().includes(term);
+    return matchType && matchName;
+  });
+  countEl.textContent = filtered.length;
+  grid.innerHTML = '';
+  emptyEl.classList.toggle('visible', filtered.length === 0);
+  filtered.forEach(g => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const cover = document.createElement('img');
+    cover.className = 'cover';
+    cover.src     = g.img;
+    cover.alt     = g.name;
+    cover.loading = 'lazy';
+    cover.onerror = () => { cover.src = './default.jpg'; };
+    const badge = document.createElement('div');
+    badge.className = 'badge';
+    const badgeImg = document.createElement('img');
+    badgeImg.src = './gallery_images/' + g.type + '.png';
+    badgeImg.alt = g.type;
+    badge.appendChild(badgeImg);
+    const tooltip = document.createElement('div');
+    tooltip.className = 'card-tooltip';
+    tooltip.textContent = g.name;
+    card.append(cover, badge, tooltip);
+    card.addEventListener('click', () => sendToAhk({ action: 'launch', uri: g.uri }));
+    grid.appendChild(card);
+  });
+  fitWindow();
+}
+
+// Búsqueda
+searchEl.addEventListener('input', () => { searchTerm = searchEl.value; renderGrid(); });
+
+// Filtros
+filterBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    filterBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.type;
+    renderGrid();
+  });
+});
+
+// Botón cerrar
+document.getElementById('btn-close').addEventListener('click', () => sendToAhk({ action: 'close' }));
+
+// Teclas
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') sendToAhk({ action: 'close' });
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); searchEl.focus(); }
+});
+
+renderGrid();
+</script>
+</body>
+</html>
+"@
+
+    $html | Out-File -FilePath $htmlPath -Encoding UTF8 -Force
+    Write-Host "`n[GALLERY] HTML generado: $htmlPath" -ForegroundColor Green
+    Write-Host "[GALLERY] Total juegos incluidos: $($Games.Count)" -ForegroundColor Green
+}
+
+# Llamada condicional — solo se ejecuta si se pasa -GenerateHTML
+if ($GenerateHTML) {
+    Generate-GalleryHTML -Games $allGames -OutputDir $outputDir -SkinName $skinName
+}
+
+Write-Host "`nPROCESO TERMINADO - MODO ACTUAL: $ModoGrid" -ForegroundColor Magenta

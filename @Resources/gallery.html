@@ -1,0 +1,380 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus Grid — Gallery</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #0d0d0f;
+    --surface:    #131316;
+    --border:     #1e1e24;
+    --accent:     #c18dab;
+    --accent2:    #ff9f50;
+    --text:       #e0e0e0;
+    --muted:      #555560;
+    --steam:      #1a9fff;
+    --epic:       #2ecc71;
+    --blizzard:   #00aeff;
+    --card-w:     110px;
+    --card-h:     165px;
+    --gap:        14px;
+    --radius:     10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: transparent;
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    background: rgba(13, 13, 15, 0.90);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  #topbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 16px;
+    background: rgba(19, 19, 22, 0.85);
+    border-bottom: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    flex-shrink: 0;
+    -webkit-app-region: drag;
+  }
+
+  /* Elementos dentro del topbar no deben ser arrastrables */
+  #topbar > * { -webkit-app-region: no-drag; }
+
+  #logo {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent2);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  #search-wrap { flex: 1; position: relative; max-width: 380px; }
+  #search-wrap svg {
+    position: absolute; left: 10px; top: 50%;
+    transform: translateY(-50%); opacity: 0.4; pointer-events: none;
+  }
+  #search {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 7px 12px 7px 34px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #search:focus { border-color: var(--accent); }
+  #search::placeholder { color: var(--muted); }
+
+  #filters { display: flex; gap: 6px; flex-shrink: 0; }
+  .filter-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 0.18s;
+    text-transform: uppercase;
+  }
+  .filter-btn:hover  { border-color: var(--accent); color: var(--accent); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #0d0d0f; }
+  .filter-btn[data-type="Steam"].active   { background: var(--steam);    border-color: var(--steam);    color: #fff; }
+  .filter-btn[data-type="Epic"].active    { background: var(--epic);     border-color: var(--epic);     color: #fff; }
+  .filter-btn[data-type="Blizzard"].active{ background: var(--blizzard); border-color: var(--blizzard); color: #fff; }
+
+  #count { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  #count span { color: var(--accent2); font-weight: 600; }
+
+  /* Botón cerrar */
+  #btn-close {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1;
+    width: 28px; height: 24px;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #btn-close:hover { background: #c0392b; border-color: #c0392b; color: #fff; }
+
+  /* Grid */
+  #grid-wrap {
+    overflow: visible;
+    padding: 20px;
+  }
+
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, var(--card-w));
+    gap: var(--gap);
+    justify-content: start;
+  }
+
+  /* Card */
+  .card {
+    position: relative;
+    width: var(--card-w); height: var(--card-h);
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.22s cubic-bezier(.34,1.4,.64,1), box-shadow 0.22s;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    animation: fadeIn 0.3s ease both;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .card:hover {
+    transform: scale(1.07) translateY(-3px);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.55), 0 0 0 1px var(--accent);
+    z-index: 10;
+  }
+  .card > .cover { width: 100%; height: 100%; object-fit: cover; display: block; transition: filter 0.22s; }
+  .card:hover > .cover { filter: brightness(1.08); }
+
+  /* Badge con icono PNG */
+  .badge {
+    position: absolute; top: 5px; right: 5px;
+    width: 20px; height: 20px;
+    border-radius: 5px;
+    overflow: hidden;
+    opacity: 0.9;
+    backdrop-filter: blur(4px);
+    background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .badge img { width: 14px; height: 14px; object-fit: contain; }
+
+  /* Tooltip nombre */
+  .card-tooltip {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.88) 60%);
+    padding: 18px 6px 6px;
+    font-size: 10px; font-weight: 500; color: #fff; line-height: 1.2;
+    opacity: 0; transform: translateY(4px);
+    transition: opacity 0.18s, transform 0.18s; pointer-events: none;
+  }
+  .card:hover .card-tooltip { opacity: 1; transform: translateY(0); }
+
+  #empty { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; color: var(--muted); }
+  #empty.visible { display: flex; }
+  #empty svg { opacity: 0.3; }
+  #empty p { font-size: 14px; }
+
+  #grid-wrap { scrollbar-gutter: stable; }
+  .card:nth-child(1)    { animation-delay: 0ms }
+  .card:nth-child(2)    { animation-delay: 15ms }
+  .card:nth-child(3)    { animation-delay: 30ms }
+  .card:nth-child(4)    { animation-delay: 45ms }
+  .card:nth-child(5)    { animation-delay: 60ms }
+  .card:nth-child(6)    { animation-delay: 75ms }
+  .card:nth-child(7)    { animation-delay: 90ms }
+  .card:nth-child(8)    { animation-delay: 105ms }
+  .card:nth-child(9)    { animation-delay: 120ms }
+  .card:nth-child(10)   { animation-delay: 135ms }
+  .card:nth-child(n+11) { animation-delay: 150ms }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div id="logo">󰊴 Nexus Grid</div>
+    <div id="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input id="search" type="text" placeholder="Buscar juego..." autocomplete="off" spellcheck="false">
+    </div>
+    <div id="filters">
+      <button class="filter-btn active" data-type="All">Todos</button>
+      <button class="filter-btn" data-type="Steam">Steam</button>
+      <button class="filter-btn" data-type="Epic">Epic</button>
+      <button class="filter-btn" data-type="Blizzard">Blizzard</button>
+    </div>
+    <div id="count"><span id="visible-count">48</span> / 48 juegos</div>
+    <button id="btn-close" title="Cerrar (Esc)">✕</button>
+  </div>
+  <div id="grid-wrap">
+    <div id="grid"></div>
+    <div id="empty">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <p>Sin resultados para esa búsqueda</p>
+    </div>
+  </div>
+</div>
+<script>
+const GAMES = [
+{"id":"epic_da49ca987d764445bfeac7bc64cb8ff0","name":"A Plague Tale: Requiem","type":"Epic","img":"./gallery_images/epic_da49ca987d764445bfeac7bc64cb8ff0_blur.png","uri":"com.epicgames.launcher://apps/da49ca987d764445bfeac7bc64cb8ff0?action=launch&silent=true"},
+{"id":"1466860","name":"Age of Empires IV: Anniversary Edition","type":"Steam","img":"./gallery_images/1466860_blur.png","uri":"steam://rungameid/1466860"},
+{"id":"epic_dc9d2e595d0e4650b35d659f90d41059","name":"Alan Wake 2","type":"Epic","img":"./gallery_images/epic_dc9d2e595d0e4650b35d659f90d41059_blur.png","uri":"com.epicgames.launcher://apps/dc9d2e595d0e4650b35d659f90d41059?action=launch&silent=true"},
+{"id":"668580","name":"Atomic Heart","type":"Steam","img":"./gallery_images/668580_blur.png","uri":"steam://rungameid/668580"},
+{"id":"1086940","name":"Baldur\'s Gate 3","type":"Steam","img":"./gallery_images/1086940_blur.png","uri":"steam://rungameid/1086940"},
+{"id":"2358720","name":"Black Myth: Wukong","type":"Steam","img":"./gallery_images/2358720_blur.png","uri":"steam://rungameid/2358720"},
+{"id":"1903340","name":"Clair Obscur: Expedition 33","type":"Steam","img":"./gallery_images/1903340_blur.png","uri":"steam://rungameid/1903340"},
+{"id":"1479730","name":"Commandos: Origins","type":"Steam","img":"./gallery_images/1479730_blur.png","uri":"steam://rungameid/1479730"},
+{"id":"731490","name":"Crash Bandicoot™ N. Sane Trilogy","type":"Steam","img":"./gallery_images/731490_blur.png","uri":"steam://rungameid/731490"},
+{"id":"268910","name":"Cuphead","type":"Steam","img":"./gallery_images/268910_blur.png","uri":"steam://rungameid/268910"},
+{"id":"1091500","name":"Cyberpunk 2077","type":"Steam","img":"./gallery_images/1091500_blur.png","uri":"steam://rungameid/1091500"},
+{"id":"374320","name":"DARK SOULS™ III","type":"Steam","img":"./gallery_images/374320_blur.png","uri":"steam://rungameid/374320"},
+{"id":"1693980","name":"Dead Space","type":"Steam","img":"./gallery_images/1693980_blur.png","uri":"steam://rungameid/1693980"},
+{"id":"601150","name":"Devil May Cry 5","type":"Steam","img":"./gallery_images/601150_blur.png","uri":"steam://rungameid/601150"},
+{"id":"blizz_DiabloIII","name":"Diablo III","type":"Blizzard","img":"./gallery_images/blizz_DiabloIII_blur.png","uri":"H:/BlizardLibrary/Diablo III"},
+{"id":"2344520","name":"Diablo® IV","type":"Steam","img":"./gallery_images/2344520_blur.png","uri":"steam://rungameid/2344520"},
+{"id":"678950","name":"DRAGON BALL FighterZ","type":"Steam","img":"./gallery_images/678950_blur.png","uri":"steam://rungameid/678950"},
+{"id":"2054970","name":"Dragon\'s Dogma 2","type":"Steam","img":"./gallery_images/2054970_blur.png","uri":"steam://rungameid/2054970"},
+{"id":"1245620","name":"ELDEN RING","type":"Steam","img":"./gallery_images/1245620_blur.png","uri":"steam://rungameid/1245620"},
+{"id":"371660","name":"Far Cry Primal","type":"Steam","img":"./gallery_images/371660_blur.png","uri":"steam://rungameid/371660"},
+{"id":"637650","name":"FINAL FANTASY XV WINDOWS EDITION","type":"Steam","img":"./gallery_images/637650_blur.png","uri":"steam://rungameid/637650"},
+{"id":"2322010","name":"God of War Ragnarök","type":"Steam","img":"./gallery_images/2322010_blur.png","uri":"steam://rungameid/2322010"},
+{"id":"epic_fa4240e57a3c46b39f169041b7811293","name":"Hogwarts Legacy","type":"Epic","img":"./gallery_images/epic_fa4240e57a3c46b39f169041b7811293_blur.png","uri":"com.epicgames.launcher://apps/fa4240e57a3c46b39f169041b7811293?action=launch&silent=true"},
+{"id":"367520","name":"Hollow Knight","type":"Steam","img":"./gallery_images/367520_blur.png","uri":"steam://rungameid/367520"},
+{"id":"1030300","name":"Hollow Knight: Silksong","type":"Steam","img":"./gallery_images/1030300_blur.png","uri":"steam://rungameid/1030300"},
+{"id":"2561580","name":"Horizon Zero Dawn™ Remastered","type":"Steam","img":"./gallery_images/2561580_blur.png","uri":"steam://rungameid/2561580"},
+{"id":"1627720","name":"Lies of P","type":"Steam","img":"./gallery_images/1627720_blur.png","uri":"steam://rungameid/1627720"},
+{"id":"epic_63a665088eb1480298f1e57943b225d8","name":"Marvel\'s Guardians of the Galaxy","type":"Epic","img":"./gallery_images/epic_63a665088eb1480298f1e57943b225d8_blur.png","uri":"com.epicgames.launcher://apps/63a665088eb1480298f1e57943b225d8?action=launch&silent=true"},
+{"id":"287700","name":"METAL GEAR SOLID V: THE PHANTOM PAIN","type":"Steam","img":"./gallery_images/287700_blur.png","uri":"steam://rungameid/287700"},
+{"id":"1449560","name":"Metro Exodus Enhanced Edition","type":"Steam","img":"./gallery_images/1449560_blur.png","uri":"steam://rungameid/1449560"},
+{"id":"241930","name":"Middle-earth™: Shadow of Mordor™","type":"Steam","img":"./gallery_images/241930_blur.png","uri":"steam://rungameid/241930"},
+{"id":"976310","name":"Mortal Kombat 11","type":"Steam","img":"./gallery_images/976310_blur.png","uri":"steam://rungameid/976310"},
+{"id":"524220","name":"NieR:Automata™","type":"Steam","img":"./gallery_images/524220_blur.png","uri":"steam://rungameid/524220"},
+{"id":"1057090","name":"Ori and the Will of the Wisps","type":"Steam","img":"./gallery_images/1057090_blur.png","uri":"steam://rungameid/1057090"},
+{"id":"1174180","name":"Red Dead Redemption 2","type":"Steam","img":"./gallery_images/1174180_blur.png","uri":"steam://rungameid/1174180"},
+{"id":"883710","name":"Resident Evil 2","type":"Steam","img":"./gallery_images/883710_blur.png","uri":"steam://rungameid/883710"},
+{"id":"2050650","name":"Resident Evil 4","type":"Steam","img":"./gallery_images/2050650_blur.png","uri":"steam://rungameid/2050650"},
+{"id":"418370","name":"Resident Evil 7 Biohazard","type":"Steam","img":"./gallery_images/418370_blur.png","uri":"steam://rungameid/418370"},
+{"id":"3764200","name":"Resident Evil Requiem","type":"Steam","img":"./gallery_images/3764200_blur.png","uri":"steam://rungameid/3764200"},
+{"id":"391220","name":"Rise of the Tomb Raider","type":"Steam","img":"./gallery_images/391220_blur.png","uri":"steam://rungameid/391220"},
+{"id":"750920","name":"Shadow of the Tomb Raider","type":"Steam","img":"./gallery_images/750920_blur.png","uri":"steam://rungameid/750920"},
+{"id":"2124490","name":"SILENT HILL 2","type":"Steam","img":"./gallery_images/2124490_blur.png","uri":"steam://rungameid/2124490"},
+{"id":"1774580","name":"STAR WARS Jedi: Survivor™","type":"Steam","img":"./gallery_images/1774580_blur.png","uri":"steam://rungameid/1774580"},
+{"id":"blizz_StarCraftII","name":"StarCraft II","type":"Blizzard","img":"./gallery_images/blizz_StarCraftII_blur.png","uri":"H:/BlizardLibrary/StarCraft II"},
+{"id":"2531310","name":"The Last of Us™ Part II Remastered","type":"Steam","img":"./gallery_images/2531310_blur.png","uri":"steam://rungameid/2531310"},
+{"id":"292030","name":"The Witcher 3: Wild Hunt","type":"Steam","img":"./gallery_images/292030_blur.png","uri":"steam://rungameid/292030"},
+{"id":"1237970","name":"Titanfall® 2","type":"Steam","img":"./gallery_images/1237970_blur.png","uri":"steam://rungameid/1237970"},
+{"id":"2183900","name":"Warhammer 40,000: Space Marine 2","type":"Steam","img":"./gallery_images/2183900_blur.png","uri":"steam://rungameid/2183900"}
+];
+const TOTAL    = GAMES.length;
+const grid     = document.getElementById('grid');
+const searchEl = document.getElementById('search');
+const emptyEl  = document.getElementById('empty');
+const countEl  = document.getElementById('visible-count');
+const filterBtns = document.querySelectorAll('.filter-btn');
+let activeFilter = 'All';
+let searchTerm   = '';
+
+function sendToAhk(obj) {
+  if (window.chrome && window.chrome.webview)
+    window.chrome.webview.postMessage(JSON.stringify(obj));
+}
+
+// Ajustar ventana al contenido real del grid
+function fitWindow() {
+  // Esperar un frame para que el DOM tenga las dimensiones correctas
+  requestAnimationFrame(() => {
+    const topbarH  = document.getElementById('topbar').offsetHeight;
+    const gridEl   = document.getElementById('grid');
+    const gridRect = gridEl.getBoundingClientRect();
+    const padding  = 20; // padding del grid-wrap (igual en todos los lados)
+    const rows     = gridEl.children.length > 0 ? gridEl.offsetHeight : 0;
+    const totalH   = topbarH + padding + rows + padding;
+    const totalW   = gridRect.width + padding * 2;
+    sendToAhk({ action: 'resize', w: Math.ceil(totalW), h: Math.ceil(totalH) });
+  });
+}
+
+function renderGrid() {
+  const term = searchTerm.toLowerCase();
+  const filtered = GAMES.filter(g => {
+    const matchType = activeFilter === 'All' || g.type === activeFilter;
+    const matchName = g.name.toLowerCase().includes(term);
+    return matchType && matchName;
+  });
+  countEl.textContent = filtered.length;
+  grid.innerHTML = '';
+  emptyEl.classList.toggle('visible', filtered.length === 0);
+  filtered.forEach(g => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const cover = document.createElement('img');
+    cover.className = 'cover';
+    cover.src     = g.img;
+    cover.alt     = g.name;
+    cover.loading = 'lazy';
+    cover.onerror = () => { cover.src = './default.jpg'; };
+    const badge = document.createElement('div');
+    badge.className = 'badge';
+    const badgeImg = document.createElement('img');
+    badgeImg.src = './gallery_images/' + g.type + '.png';
+    badgeImg.alt = g.type;
+    badge.appendChild(badgeImg);
+    const tooltip = document.createElement('div');
+    tooltip.className = 'card-tooltip';
+    tooltip.textContent = g.name;
+    card.append(cover, badge, tooltip);
+    card.addEventListener('click', () => sendToAhk({ action: 'launch', uri: g.uri }));
+    grid.appendChild(card);
+  });
+  fitWindow();
+}
+
+// Búsqueda
+searchEl.addEventListener('input', () => { searchTerm = searchEl.value; renderGrid(); });
+
+// Filtros
+filterBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    filterBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeFilter = btn.dataset.type;
+    renderGrid();
+  });
+});
+
+// Botón cerrar
+document.getElementById('btn-close').addEventListener('click', () => sendToAhk({ action: 'close' }));
+
+// Teclas
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') sendToAhk({ action: 'close' });
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); searchEl.focus(); }
+});
+
+renderGrid();
+</script>
+</body>
+</html>
