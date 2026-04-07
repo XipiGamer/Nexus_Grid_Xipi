@@ -1,19 +1,8 @@
 #Requires AutoHotkey v2.0
-#SingleInstance Ignore  ; No reemplazar instancia — manejar toggle manualmente
-
-; ==========================================
-; NEXUS GRID - GALLERY VIEW (WebView2)
-; Toggle: si ya está abierto lo cierra, si no lo abre
-; ==========================================
-
-; --- TOGGLE: cerrar si ya existe una instancia ---
-hwnd := WinExist("Nexus Grid — Gallery ahk_class AutoHotkeyGUI")
-if hwnd {
-    WinClose(hwnd)
-    ExitApp()
-}
+#SingleInstance Force
 
 #Include "H:\proyectos\Nexus_Grid_Xipi\Lib\WebView2.ahk"
+
 
 rutaBase   := "H:\proyectos\Nexus_Grid_Xipi"
 rutaHTML   := rutaBase . "\@Resources\gallery.html"
