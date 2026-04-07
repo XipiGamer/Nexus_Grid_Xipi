@@ -112,19 +112,23 @@
   #count { font-size: 11px; color: var(--muted); white-space: nowrap; }
   #count span { color: var(--accent2); font-weight: 600; }
 
-  /* Botón cerrar */
+  /* Botón cerrar — flotante esquina superior derecha del grid */
   #btn-close {
-    background: transparent;
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(13,13,15,0.85);
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--muted);
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1;
-    width: 28px; height: 24px;
+    width: 26px; height: 22px;
     cursor: pointer;
     transition: all 0.15s;
-    flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
   }
   #btn-close:hover { background: #c0392b; border-color: #c0392b; color: #fff; }
 
@@ -132,13 +136,14 @@
   #grid-wrap {
     overflow: visible;
     padding: 20px;
+    position: relative;
   }
 
   #grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, var(--card-w));
     gap: var(--gap);
-    justify-content: start;
+    justify-content: center;
   }
 
   /* Card */
@@ -225,9 +230,9 @@
       <button class="filter-btn" data-type="Blizzard">Blizzard</button>
     </div>
     <div id="count"><span id="visible-count">48</span> / 48 juegos</div>
-    <button id="btn-close" title="Cerrar (Esc)">✕</button>
   </div>
   <div id="grid-wrap">
+    <button id="btn-close" title="Cerrar (Esc)">✕</button>
     <div id="grid"></div>
     <div id="empty">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -253,7 +258,7 @@ const GAMES = [
 {"id":"374320","name":"DARK SOULS™ III","type":"Steam","img":"./gallery_images/374320_blur.png","uri":"steam://rungameid/374320"},
 {"id":"1693980","name":"Dead Space","type":"Steam","img":"./gallery_images/1693980_blur.png","uri":"steam://rungameid/1693980"},
 {"id":"601150","name":"Devil May Cry 5","type":"Steam","img":"./gallery_images/601150_blur.png","uri":"steam://rungameid/601150"},
-{"id":"blizz_DiabloIII","name":"Diablo III","type":"Blizzard","img":"./gallery_images/blizz_DiabloIII_blur.png","uri":"H:/BlizardLibrary/Diablo III"},
+{"id":"blizz_DiabloIII","name":"Diablo III","type":"Blizzard","img":"./gallery_images/blizz_DiabloIII_blur.png","uri":"battlenet://DiabloIII"},
 {"id":"2344520","name":"Diablo® IV","type":"Steam","img":"./gallery_images/2344520_blur.png","uri":"steam://rungameid/2344520"},
 {"id":"678950","name":"DRAGON BALL FighterZ","type":"Steam","img":"./gallery_images/678950_blur.png","uri":"steam://rungameid/678950"},
 {"id":"2054970","name":"Dragon\'s Dogma 2","type":"Steam","img":"./gallery_images/2054970_blur.png","uri":"steam://rungameid/2054970"},
@@ -282,7 +287,7 @@ const GAMES = [
 {"id":"750920","name":"Shadow of the Tomb Raider","type":"Steam","img":"./gallery_images/750920_blur.png","uri":"steam://rungameid/750920"},
 {"id":"2124490","name":"SILENT HILL 2","type":"Steam","img":"./gallery_images/2124490_blur.png","uri":"steam://rungameid/2124490"},
 {"id":"1774580","name":"STAR WARS Jedi: Survivor™","type":"Steam","img":"./gallery_images/1774580_blur.png","uri":"steam://rungameid/1774580"},
-{"id":"blizz_StarCraftII","name":"StarCraft II","type":"Blizzard","img":"./gallery_images/blizz_StarCraftII_blur.png","uri":"H:/BlizardLibrary/StarCraft II"},
+{"id":"blizz_StarCraftII","name":"StarCraft II","type":"Blizzard","img":"./gallery_images/blizz_StarCraftII_blur.png","uri":"battlenet://S2"},
 {"id":"2531310","name":"The Last of Us™ Part II Remastered","type":"Steam","img":"./gallery_images/2531310_blur.png","uri":"steam://rungameid/2531310"},
 {"id":"292030","name":"The Witcher 3: Wild Hunt","type":"Steam","img":"./gallery_images/292030_blur.png","uri":"steam://rungameid/292030"},
 {"id":"1237970","name":"Titanfall® 2","type":"Steam","img":"./gallery_images/1237970_blur.png","uri":"steam://rungameid/1237970"},
@@ -302,18 +307,18 @@ function sendToAhk(obj) {
     window.chrome.webview.postMessage(JSON.stringify(obj));
 }
 
-// Ajustar ventana al contenido real del grid
+// Ajustar SOLO el alto de la ventana al contenido del grid (ancho fijo)
 function fitWindow() {
-  // Esperar un frame para que el DOM tenga las dimensiones correctas
   requestAnimationFrame(() => {
-    const topbarH  = document.getElementById('topbar').offsetHeight;
-    const gridEl   = document.getElementById('grid');
-    const gridRect = gridEl.getBoundingClientRect();
-    const padding  = 20; // padding del grid-wrap (igual en todos los lados)
-    const rows     = gridEl.children.length > 0 ? gridEl.offsetHeight : 0;
-    const totalH   = topbarH + padding + rows + padding;
-    const totalW   = gridRect.width + padding * 2;
-    sendToAhk({ action: 'resize', w: Math.ceil(totalW), h: Math.ceil(totalH) });
+    const topbarH = document.getElementById('topbar').offsetHeight;
+    const gridEl  = document.getElementById('grid');
+    const pad     = 20;
+
+    // Medir el alto real del grid después de renderizar
+    const gridH  = gridEl.offsetHeight;
+    const totalH = topbarH + pad + gridH + pad;
+
+    sendToAhk({ action: 'resize_h', h: Math.ceil(totalH) });
   });
 }
 

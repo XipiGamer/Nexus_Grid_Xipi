@@ -1,21 +1,19 @@
 #Requires AutoHotkey v2.0
-#SingleInstance Force
+#SingleInstance Ignore  ; No reemplazar instancia — manejar toggle manualmente
 
-; Si se pasa --close, matar la instancia existente y salir
-if (A_Args.Length > 0 && A_Args[1] = "--close") {
-    for proc in ComObjGet("winmgmts:").ExecQuery("SELECT * FROM Win32_Process WHERE Name='AutoHotkey64.exe'") {
-        if InStr(proc.CommandLine, "Gallery.ahk") && proc.ProcessId != DllCall("GetCurrentProcessId") {
-            Run("taskkill /PID " . proc.ProcessId . " /F", , "Hide")
-        }
-    }
+; ==========================================
+; NEXUS GRID - GALLERY VIEW (WebView2)
+; Toggle: si ya está abierto lo cierra, si no lo abre
+; ==========================================
+
+; --- TOGGLE: cerrar si ya existe una instancia ---
+hwnd := WinExist("Nexus Grid — Gallery ahk_class AutoHotkeyGUI")
+if hwnd {
+    WinClose(hwnd)
     ExitApp()
 }
 
 #Include "H:\proyectos\Nexus_Grid_Xipi\Lib\WebView2.ahk"
-
-; ==========================================
-; NEXUS GRID - GALLERY VIEW (WebView2)
-; ==========================================
 
 rutaBase   := "H:\proyectos\Nexus_Grid_Xipi"
 rutaHTML   := rutaBase . "\@Resources\gallery.html"
@@ -27,37 +25,40 @@ if !FileExist(rutaHTML) {
     RunWait('"' . rutaPS . '" -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . rutaScript . '" -GenerateHTML', , "Hide")
 }
 
-; --- DIMENSIONES INICIALES (se ajustan dinámicamente desde JS) ---
+; --- DIMENSIONES ---
 screenW := A_ScreenWidth
 screenH := A_ScreenHeight
-winW    := Round(screenW * 0.82)
-winH    := Round(screenH * 0.15)   ; altura mínima inicial, JS la ajusta
+cardW   := 110
+gap     := 14
+pad     := 20
+cols    := Min(16, Floor((screenW * 0.95 - pad * 2 + gap) / (cardW + gap)))
+winW    := cols * (cardW + gap) - gap + pad * 2
+winH    := Round(screenH * 0.15)
 posX    := Round((screenW - winW) / 2)
 posY    := Round((screenH - winH) / 2)
 
-; --- CREAR VENTANA con fondo transparente ---
-myGui := Gui("-Caption +AlwaysOnTop +Resize +E0x00080000")
+; --- CREAR VENTANA ---
+myGui := Gui("-Caption +AlwaysOnTop +Resize")
 myGui.BackColor := "0d0d0f"
-WinSetTransparent(230, myGui.Hwnd)  ; 230/255 ≈ 90% opacidad
+myGui.Title := "Nexus Grid — Gallery"
+WinSetTransparent(230, myGui.Hwnd)
 
 ; --- MOSTRAR antes de crear WebView2 ---
 myGui.Show("w" . winW . " h" . winH . " x" . posX . " y" . posY . " NoActivate")
 
 ; --- ESQUINAS REDONDEADAS ---
-ApplyRoundedCorners(winW, winH) {
+ApplyRoundedCorners(w, h) {
     global myGui
-    radio  := 14
-    region := DllCall("Gdi32.dll\CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", winW, "Int", winH, "Int", radio, "Int", radio)
+    region := DllCall("Gdi32.dll\CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", w, "Int", h, "Int", 14, "Int", 14)
     DllCall("User32.dll\SetWindowRgn", "UInt", myGui.Hwnd, "UInt", region, "UInt", 1)
 }
 ApplyRoundedCorners(winW, winH)
 
 ; --- WEBVIEW2 ---
-wvc := WebView2.CreateControllerAsync(myGui.Hwnd).await2()
+dataDir := A_Temp . "\NexusGrid_WV2"
+wvc := WebView2.CreateControllerAsync(myGui.Hwnd, 0, dataDir).await2()
 wv  := wvc.CoreWebView2
 
-; Bounds iniciales
-global wvc, wv, winW, winH
 SetBounds(w, h) {
     global wvc
     b := Buffer(16)
@@ -69,7 +70,9 @@ SetBounds(w, h) {
 }
 SetBounds(winW, winH)
 
-wv.Navigate("file:///" . StrReplace(rutaHTML, "\", "/"))
+; Cache-busting
+timestamp := A_NowUTC
+wv.Navigate("file:///" . StrReplace(rutaHTML, "\", "/") . "?v=" . timestamp)
 
 ; --- CERRAR CON ESCAPE ---
 myGui.OnEvent("Escape", (*) => myGui.Destroy())
@@ -78,32 +81,26 @@ Hotkey("Escape", (*) => myGui.Destroy())
 ; --- MENSAJES DESDE JS ---
 wv.add_WebMessageReceived(OnWebMessage)
 OnWebMessage(wv2, args) {
-    global myGui, winW, winH, screenW, screenH, posX, posY
+    global myGui, winW, winH, screenW, screenH
     msg := args.TryGetWebMessageAsString()
     try {
-        if RegExMatch(msg, '"action"\s*:\s*"resize".*?"w"\s*:\s*(\d+).*?"h"\s*:\s*(\d+)', &m) {
-            newW := Integer(m[1])
-            newH := Integer(m[2])
-
-            ; Limitar al 95% de la pantalla
-            maxW := Round(screenW * 0.95)
-            maxH := Round(screenH * 0.92)
-            newW := Min(newW, maxW)
-            newH := Min(newH, maxH)
-
-            ; Centrar
-            newX := Round((screenW - newW) / 2)
+        if RegExMatch(msg, '"action"\s*:\s*"resize_h".*?"h"\s*:\s*(\d+)', &m) {
+            newH := Integer(m[1])
+            newH := Min(newH, Round(screenH * 0.92))
             newY := Round((screenH - newH) / 2)
-
-            winW := newW
+            newX := Round((screenW - winW) / 2)
             winH := newH
-
-            myGui.Move(newX, newY, newW, newH)
-            SetBounds(newW, newH)
-            ApplyRoundedCorners(newW, newH)
+            myGui.Move(newX, newY, winW, newH)
+            SetBounds(winW, newH)
+            ApplyRoundedCorners(winW, newH)
         }
-        else if RegExMatch(msg, '"action"\s*:\s*"launch".*?"uri"\s*:\s*"([^"]+)"', &m)
-            Run(m[1])
+        else if RegExMatch(msg, '"action"\s*:\s*"launch".*?"uri"\s*:\s*"([^"]+)"', &m) {
+            uri := m[1]
+            if InStr(uri, "battlenet://") || InStr(uri, "steam://") || InStr(uri, "com.epicgames")
+                Run(uri)
+            else
+                Run('"' . uri . '"')
+        }
         else if RegExMatch(msg, '"action"\s*:\s*"close"')
             myGui.Destroy()
     }

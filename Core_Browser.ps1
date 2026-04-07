@@ -314,8 +314,20 @@ foreach ($game in ($allGames | Sort-Object Name)) {
             [PSCustomObject]@{ Path = $_.FullName; Name = $_.Name; Score = $score }
         } | Sort-Object Score -Descending | Select-Object -First 1
 
-        # 3. Asignación con Verbose
-        if ($bestMatch -and $bestMatch.Score -gt 0) {
+        # 3. Mapa directo de nombres → URI Battle.net
+        $blizzURIs = @{
+            "Diablo III"   = "battlenet://DiabloIII"
+            "StarCraft II" = "battlenet://S2"
+            "Overwatch 2"  = "battlenet://Pro"
+            "Hearthstone"  = "battlenet://WTCG"
+            "World of Warcraft" = "battlenet://WoW"
+            "Diablo IV"    = "battlenet://Fen"
+        }
+        if ($blizzURIs.ContainsKey($game.Name)) {
+            Write-Host "   -> URI Battle.net: $($blizzURIs[$game.Name])" -ForegroundColor DarkGray
+            $action = "[`"$($blizzURIs[$game.Name])`"]"
+        }
+        elseif ($bestMatch -and $bestMatch.Score -gt 0) {
             Write-Host "   -> Ganador: $($bestMatch.Name) (Score: $($bestMatch.Score))" -ForegroundColor DarkGray
             $rutaLimpia = $bestMatch.Path -replace '\\', '\\'
             $action = "[`"$rutaLimpia`"]"
@@ -513,14 +525,25 @@ function Generate-GalleryHTML {
         }
 
         # URI de lanzamiento
+        $blizzURIs = @{
+            "Diablo III"   = "battlenet://DiabloIII"
+            "StarCraft II" = "battlenet://S2"
+            "Overwatch 2"  = "battlenet://Pro"
+            "Hearthstone"  = "battlenet://WTCG"
+            "World of Warcraft" = "battlenet://WoW"
+            "Diablo IV"    = "battlenet://Fen"
+        }
         $uri = switch ($game.Type) {
             "Steam"    { "steam://rungameid/$($game.ID)" }
             "Epic"     { $game.LaunchURI }
-            "Blizzard" { $game.SourcePath -replace '\\', '/' }
+            "Blizzard" {
+                if ($blizzURIs.ContainsKey($game.Name)) { $blizzURIs[$game.Name] }
+                else { "battlenet://" }
+            }
             default    { "" }
         }
 
-        $name = $game.Name -replace '"', '\"' -replace "'", "\'"
+        $name = ($game.Name -replace "`r`n|`r|`n", " ").Trim(); $name = $name -replace '"', '\"' -replace "'", "\'"
         $type = $game.Type
 
         "{`"id`":`"$($game.ID)`",`"name`":`"$name`",`"type`":`"$type`",`"img`":`"$imgSrc`",`"uri`":`"$uri`"}"
@@ -643,33 +666,20 @@ function Generate-GalleryHTML {
   #count { font-size: 11px; color: var(--muted); white-space: nowrap; }
   #count span { color: var(--accent2); font-weight: 600; }
 
-  /* Botón cerrar */
-  #btn-close {
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    color: var(--muted);
-    font-size: 14px;
-    line-height: 1;
-    width: 28px; height: 24px;
-    cursor: pointer;
-    transition: all 0.15s;
-    flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-  }
-  #btn-close:hover { background: #c0392b; border-color: #c0392b; color: #fff; }
+
 
   /* Grid */
   #grid-wrap {
     overflow: visible;
     padding: 20px;
+    position: relative;
   }
 
   #grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, var(--card-w));
     gap: var(--gap);
-    justify-content: start;
+    justify-content: center;
   }
 
   /* Card */
@@ -756,7 +766,6 @@ function Generate-GalleryHTML {
       <button class="filter-btn" data-type="Blizzard">Blizzard</button>
     </div>
     <div id="count"><span id="visible-count">$totalGames</span> / $totalGames juegos</div>
-    <button id="btn-close" title="Cerrar (Esc)">✕</button>
   </div>
   <div id="grid-wrap">
     <div id="grid"></div>
@@ -786,18 +795,18 @@ function sendToAhk(obj) {
     window.chrome.webview.postMessage(JSON.stringify(obj));
 }
 
-// Ajustar ventana al contenido real del grid
+// Ajustar SOLO el alto de la ventana al contenido del grid (ancho fijo)
 function fitWindow() {
-  // Esperar un frame para que el DOM tenga las dimensiones correctas
   requestAnimationFrame(() => {
-    const topbarH  = document.getElementById('topbar').offsetHeight;
-    const gridEl   = document.getElementById('grid');
-    const gridRect = gridEl.getBoundingClientRect();
-    const padding  = 20; // padding del grid-wrap (igual en todos los lados)
-    const rows     = gridEl.children.length > 0 ? gridEl.offsetHeight : 0;
-    const totalH   = topbarH + padding + rows + padding;
-    const totalW   = gridRect.width + padding * 2;
-    sendToAhk({ action: 'resize', w: Math.ceil(totalW), h: Math.ceil(totalH) });
+    const topbarH = document.getElementById('topbar').offsetHeight;
+    const gridEl  = document.getElementById('grid');
+    const pad     = 20;
+
+    // Medir el alto real del grid después de renderizar
+    const gridH  = gridEl.offsetHeight;
+    const totalH = topbarH + pad + gridH + pad;
+
+    sendToAhk({ action: 'resize_h', h: Math.ceil(totalH) });
   });
 }
 
@@ -848,9 +857,6 @@ filterBtns.forEach(btn => {
     renderGrid();
   });
 });
-
-// Botón cerrar
-document.getElementById('btn-close').addEventListener('click', () => sendToAhk({ action: 'close' }));
 
 // Teclas
 document.addEventListener('keydown', e => {
