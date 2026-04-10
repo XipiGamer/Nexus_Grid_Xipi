@@ -74,8 +74,8 @@ while ($true) {
         Write-Host "[$Timestamp] Cambio detectado: $TotalPrevio -> $TotalActual. Actualizando..." -ForegroundColor Yellow
         
         if (Test-Path $UpdateScript) {
-            # Se lanza en modo oculto para no interrumpir
-            Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -File `"$UpdateScript`"" -WindowStyle Hidden
+            # -GenerateHTML hace todo en un paso: carátulas + .inc Rainmeter + gallery.html YASB
+            Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -File `"$UpdateScript`" -GenerateHTML" -WindowStyle Hidden
         }
     }
 

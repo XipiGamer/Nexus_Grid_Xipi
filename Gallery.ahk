@@ -3,13 +3,17 @@
 
 #Include "H:\proyectos\Nexus_Grid_Xipi\Lib\WebView2.ahk"
 
+rutaBase      := "H:\proyectos\Nexus_Grid_Xipi"
+rutaHTML      := rutaBase . "\@Resources\gallery.html"
+rutaScript    := rutaBase . "\Core_Browser.ps1"
+rutaPS        := "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+rutaEstado    := rutaBase . "\@Resources\gallery_state.txt"
+viewState     := "grid"
 
-rutaBase   := "H:\proyectos\Nexus_Grid_Xipi"
-rutaHTML   := rutaBase . "\@Resources\gallery.html"
-rutaScript := rutaBase . "\Core_Browser.ps1"
-rutaPS     := "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+; Leer último estado guardado
+if FileExist(rutaEstado)
+    viewState := Trim(FileRead(rutaEstado))
 
-; --- Si el HTML no existe, generarlo primero ---
 if !FileExist(rutaHTML) {
     RunWait('"' . rutaPS . '" -ExecutionPolicy Bypass -WindowStyle Hidden -File "' . rutaScript . '" -GenerateHTML', , "Hide")
 }
@@ -26,16 +30,15 @@ winH    := Round(screenH * 0.15)
 posX    := Round((screenW - winW) / 2)
 posY    := Round((screenH - winH) / 2)
 
-; --- CREAR VENTANA ---
+; Flag para saber si ya se hizo el primer posicionamiento
+primeraVez := true
+
+; --- VENTANA fuera de pantalla mientras carga ---
 myGui := Gui("-Caption +AlwaysOnTop +Resize")
 myGui.BackColor := "0d0d0f"
 myGui.Title := "Nexus Grid — Gallery"
-WinSetTransparent(230, myGui.Hwnd)
+myGui.Show("w" . winW . " h" . winH . " x-10000 y-10000 NoActivate")
 
-; --- MOSTRAR antes de crear WebView2 ---
-myGui.Show("w" . winW . " h" . winH . " x" . posX . " y" . posY . " NoActivate")
-
-; --- ESQUINAS REDONDEADAS ---
 ApplyRoundedCorners(w, h) {
     global myGui
     region := DllCall("Gdi32.dll\CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", w, "Int", h, "Int", 14, "Int", 14)
@@ -44,7 +47,7 @@ ApplyRoundedCorners(w, h) {
 ApplyRoundedCorners(winW, winH)
 
 ; --- WEBVIEW2 ---
-dataDir := A_Temp . "\NexusGrid_WV2"
+dataDir := A_Temp . "\NexusGrid_WV2_" . A_NowUTC
 wvc := WebView2.CreateControllerAsync(myGui.Hwnd, 0, dataDir).await2()
 wv  := wvc.CoreWebView2
 
@@ -59,29 +62,42 @@ SetBounds(w, h) {
 }
 SetBounds(winW, winH)
 
-; Cache-busting
-timestamp := A_NowUTC
-wv.Navigate("file:///" . StrReplace(rutaHTML, "\", "/") . "?v=" . timestamp)
+wv.add_NavigationCompleted(OnNavCompleted)
+wv.Navigate("file:///" . StrReplace(rutaHTML, "\", "/"))
 
-; --- CERRAR CON ESCAPE ---
+OnNavCompleted(wv2, args) {
+    global wv, viewState
+    ; Esperar que JS registre sus listeners antes de enviar el estado
+    Sleep(800)
+    wv.PostWebMessageAsString('{"action":"set_view_state","state":"' . viewState . '"}')
+}
+
+; --- ESCAPE ---
 myGui.OnEvent("Escape", (*) => myGui.Destroy())
 Hotkey("Escape", (*) => myGui.Destroy())
 
 ; --- MENSAJES DESDE JS ---
 wv.add_WebMessageReceived(OnWebMessage)
 OnWebMessage(wv2, args) {
-    global myGui, winW, winH, screenW, screenH
+    global myGui, winW, winH, screenW, screenH, primeraVez
     msg := args.TryGetWebMessageAsString()
     try {
         if RegExMatch(msg, '"action"\s*:\s*"resize_h".*?"h"\s*:\s*(\d+)', &m) {
             newH := Integer(m[1])
             newH := Min(newH, Round(screenH * 0.92))
-            newY := Round((screenH - newH) / 2)
-            newX := Round((screenW - winW) / 2)
             winH := newH
+            newX := Round((screenW - winW) / 2)
+            newY := Round((screenH - newH) / 2)
             myGui.Move(newX, newY, winW, newH)
             SetBounds(winW, newH)
             ApplyRoundedCorners(winW, newH)
+            primeraVez := false
+        }
+        else if RegExMatch(msg, '"action"\s*:\s*"save_view_state".*?"state"\s*:\s*"([^"]+)"', &m) {
+            global rutaEstado, viewState
+            viewState := m[1]
+            FileDelete(rutaEstado)
+            FileAppend(viewState, rutaEstado)
         }
         else if RegExMatch(msg, '"action"\s*:\s*"launch".*?"uri"\s*:\s*"([^"]+)"', &m) {
             uri := m[1]
@@ -89,6 +105,7 @@ OnWebMessage(wv2, args) {
                 Run(uri)
             else
                 Run('"' . uri . '"')
+            myGui.Destroy()
         }
         else if RegExMatch(msg, '"action"\s*:\s*"close"')
             myGui.Destroy()

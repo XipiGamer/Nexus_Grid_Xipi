@@ -1,7 +1,8 @@
 ﻿<!DOCTYPE html>
-<html lang="es">
+<html lang="es" style="background:#0d0d0f">
 <head>
 <meta charset="UTF-8">
+<style>html,body{background:#0d0d0f !important}</style>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nexus Grid — Gallery</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -105,7 +106,7 @@
   }
   .filter-btn:hover  { border-color: var(--accent); color: var(--accent); }
   .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #0d0d0f; }
-  .filter-btn[data-type="Steam"].active   { background: var(--steam);    border-color: var(--steam);    color: #fff; }
+  .filter-btn[data-type="Steam"].active   { background: var(--accent2);  border-color: var(--accent2);  color: #0d0d0f; }
   .filter-btn[data-type="Epic"].active    { background: var(--epic);     border-color: var(--epic);     color: #fff; }
   .filter-btn[data-type="Blizzard"].active{ background: var(--blizzard); border-color: var(--blizzard); color: #fff; }
 
@@ -182,6 +183,88 @@
   #empty p { font-size: 14px; }
 
   #grid-wrap { scrollbar-gutter: stable; }
+
+  /* ── TOGGLE VIEW BUTTON ── */
+  #btn-view {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 15px;
+    width: 28px; height: 24px;
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #btn-view:hover  { border-color: var(--accent2); color: var(--accent2); }
+  #btn-view.active { background: var(--accent2); border-color: var(--accent2); color: #0d0d0f; }
+
+  /* ── CARRUSEL ── */
+  #carousel-wrap {
+    display: none;
+    position: relative;
+    align-items: center;
+    padding: 20px 60px;
+    overflow: hidden;
+  }
+  #carousel-wrap.visible { display: flex; }
+
+  #carousel {
+    display: flex;
+    gap: 16px;
+    overflow: hidden;
+    scroll-behavior: smooth;
+    align-items: center;
+  }
+
+  /* Card en modo carrusel — más grande */
+  #carousel .card {
+    flex-shrink: 0;
+    width: 150px;
+    height: 225px;
+    transition: transform 0.3s cubic-bezier(.34,1.4,.64,1), box-shadow 0.3s, opacity 0.3s;
+    opacity: 0.55;
+    border-radius: 12px;
+  }
+  #carousel .card.active-card {
+    transform: scale(1.12);
+    opacity: 1;
+    box-shadow: 0 0 30px rgba(255,159,80,0.35), 0 0 0 1px var(--accent2);
+  }
+  #carousel .card:hover { opacity: 0.85; }
+
+  /* Flechas con blur glow */
+  .arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(13,13,15,0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,159,80,0.3);
+    border-radius: 50%;
+    color: var(--accent2);
+    font-size: 32px;
+    width: 44px; height: 44px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    z-index: 20;
+    box-shadow: 0 0 18px rgba(255,159,80,0.2);
+    line-height: 1;
+    padding-bottom: 2px;
+  }
+  .arrow:hover {
+    background: rgba(255,159,80,0.15);
+    border-color: var(--accent2);
+    box-shadow: 0 0 28px rgba(255,159,80,0.45);
+    color: #fff;
+  }
+  #arrow-left  { left: 10px; }
+  #arrow-right { right: 10px; }
+
+  /* Ocultar grid en modo carrusel */
+  #grid-wrap.hidden { display: none; }
   .card:nth-child(1)    { animation-delay: 0ms }
   .card:nth-child(2)    { animation-delay: 15ms }
   .card:nth-child(3)    { animation-delay: 30ms }
@@ -212,7 +295,16 @@
       <button class="filter-btn" data-type="Blizzard">Blizzard</button>
     </div>
     <div id="count"><span id="visible-count">48</span> / 48 juegos</div>
+    <button id="btn-view" title="Cambiar vista" onclick="toggleView()">⊞</button>
   </div>
+
+  <!-- CARRUSEL -->
+  <div id="carousel-wrap">
+    <button class="arrow" id="arrow-left" onclick="scrollCarousel(-1)">&#8249;</button>
+    <div id="carousel"></div>
+    <button class="arrow" id="arrow-right" onclick="scrollCarousel(1)">&#8250;</button>
+  </div>
+
   <div id="grid-wrap">
     <div id="grid"></div>
     <div id="empty">
@@ -339,7 +431,10 @@ function renderGrid() {
 }
 
 // Búsqueda
-searchEl.addEventListener('input', () => { searchTerm = searchEl.value; renderGrid(); });
+searchEl.addEventListener('input', () => {
+  searchTerm = searchEl.value;
+  if (isCarousel) buildCarousel(); else renderGrid();
+});
 
 // Filtros
 filterBtns.forEach(btn => {
@@ -347,7 +442,7 @@ filterBtns.forEach(btn => {
     filterBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     activeFilter = btn.dataset.type;
-    renderGrid();
+    if (isCarousel) buildCarousel(); else renderGrid();
   });
 });
 
@@ -357,7 +452,139 @@ document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'f') { e.preventDefault(); searchEl.focus(); }
 });
 
+let isCarousel = false;
+
+// Escuchar estado desde AHK (debe registrarse antes del renderGrid)
+if (window.chrome && window.chrome.webview) {
+  window.chrome.webview.addEventListener('message', e => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.action === 'set_view_state' && msg.state === 'carousel' && !isCarousel) {
+        toggleView();
+      }
+    } catch(err) {}
+  });
+}
+
 renderGrid();
+
+// ── CARRUSEL ──
+let carouselGames = [];
+let carouselIndex = 0;
+
+function toggleView() {
+  isCarousel = !isCarousel;
+  const btn = document.getElementById('btn-view');
+  const gridWrap = document.getElementById('grid-wrap');
+  const carouselWrap = document.getElementById('carousel-wrap');
+
+  if (isCarousel) {
+    btn.textContent = '⊟';
+    btn.classList.add('active');
+    gridWrap.classList.add('hidden');
+    carouselWrap.classList.add('visible');
+    buildCarousel();
+    sendToAhk({ action: 'resize_h', h: getCarouselHeight() });
+    sendToAhk({ action: 'save_view_state', state: 'carousel' });
+  } else {
+    btn.textContent = '⊞';
+    btn.classList.remove('active');
+    gridWrap.classList.remove('hidden');
+    carouselWrap.classList.remove('visible');
+    renderGrid();
+    sendToAhk({ action: 'save_view_state', state: 'grid' });
+  }
+}
+
+function getCarouselHeight() {
+  const topbarH = document.getElementById('topbar').offsetHeight;
+  return topbarH + 20 + 225 + 20; // padding + card height + padding
+}
+
+function buildCarousel() {
+  const term = searchTerm.toLowerCase();
+  carouselGames = GAMES.filter(g => {
+    const matchType = activeFilter === 'All' || g.type === activeFilter;
+    const matchName = g.name.toLowerCase().includes(term);
+    return matchType && matchName;
+  });
+  carouselIndex = 0;
+  renderCarousel();
+}
+
+function renderCarousel() {
+  const carousel = document.getElementById('carousel');
+  carousel.innerHTML = '';
+  carouselGames.forEach((g, i) => {
+    const card = document.createElement('div');
+    card.className = 'card' + (i === carouselIndex ? ' active-card' : '');
+    card.dataset.index = i;
+    const cover = document.createElement('img');
+    cover.className = 'cover';
+    cover.src = g.img;
+    cover.alt = g.name;
+    cover.loading = 'lazy';
+    cover.onerror = () => { cover.src = './default.jpg'; };
+    const badge = document.createElement('div');
+    badge.className = 'badge';
+    const badgeImg = document.createElement('img');
+    badgeImg.src = './gallery_images/' + g.type + '.png';
+    badge.appendChild(badgeImg);
+    const tooltip = document.createElement('div');
+    tooltip.className = 'card-tooltip';
+    tooltip.textContent = g.name;
+    card.append(cover, badge, tooltip);
+    card.addEventListener('click', () => {
+      if (i === carouselIndex) {
+        sendToAhk({ action: 'launch', uri: g.uri });
+      } else {
+        carouselIndex = i;
+        updateCarouselActive();
+        centerActiveCard();
+      }
+    });
+    carousel.appendChild(card);
+  });
+  centerActiveCard();
+}
+
+function updateCarouselActive() {
+  document.querySelectorAll('#carousel .card').forEach((c, i) => {
+    c.classList.toggle('active-card', i === carouselIndex);
+  });
+}
+
+function centerActiveCard() {
+  const carousel = document.getElementById('carousel');
+  const cards = carousel.querySelectorAll('.card');
+  if (!cards[carouselIndex]) return;
+  const card = cards[carouselIndex];
+  const carouselRect = carousel.getBoundingClientRect();
+  const cardRect = card.getBoundingClientRect();
+  const offset = cardRect.left - carouselRect.left - (carouselRect.width / 2) + (cardRect.width / 2);
+  carousel.scrollLeft += offset;
+}
+
+function scrollCarousel(dir) {
+  carouselIndex = Math.max(0, Math.min(carouselGames.length - 1, carouselIndex + dir));
+  updateCarouselActive();
+  centerActiveCard();
+}
+
+// Scroll del mouse en carrusel
+document.getElementById('carousel-wrap').addEventListener('wheel', e => {
+  e.preventDefault();
+  scrollCarousel(e.deltaY > 0 ? 1 : -1);
+}, { passive: false });
+
+// Teclas de flecha en carrusel
+document.addEventListener('keydown', e => {
+  if (!isCarousel) return;
+  if (e.key === 'ArrowRight') scrollCarousel(1);
+  if (e.key === 'ArrowLeft')  scrollCarousel(-1);
+});
+
+
 </script>
 </body>
 </html>
